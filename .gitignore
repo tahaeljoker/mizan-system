@@ -1,0 +1,17 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+client/dist/
+client/.vercel/
+
+# Environment variables
+.env
+server/.env
+client/.env
+
+# Local history/logs
+*.log
+.DS_Store
+.idea/
+.vscode/
