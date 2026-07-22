@@ -1,5 +1,6 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Organization from '../models/Organization.js';
 import { protect } from '../middleware/auth.js';
@@ -15,7 +16,7 @@ const generateToken = (id) => {
 };
 
 // @route   POST api/auth/register
-// @desc    Register a new shop (Organization) and its owner
+// @desc    Register a new shop (Organization) and its owner atomically
 // @access  Public
 router.post('/register', sanitizeBody(['orgId', '_id', '__v']), asyncHandler(async (req, res) => {
   const { shopName, ownerName, email, password, phone } = req.body;
@@ -29,38 +30,58 @@ router.post('/register', sanitizeBody(['orgId', '_id', '__v']), asyncHandler(asy
     return res.status(400).json({ success: false, message: 'البريد الإلكتروني مسجل بالفعل' });
   }
 
-  // 1. Create Organization (Tenant)
-  const org = await Organization.create({
-    name: shopName,
-    ownerName,
-    phone,
-    plan: 'trial',
-    status: 'active'
-  });
+  const session = await mongoose.startSession();
+  let registeredUser = null;
+  let registeredOrg = null;
 
-  // 2. Create Owner User
-  const user = await User.create({
-    name: ownerName,
-    email,
-    password,
-    role: 'owner',
-    orgId: org._id,
-    branchName: 'الكل'
-  });
+  try {
+    await session.withTransaction(async () => {
+      // 1. Create Organization (Tenant) inside transaction session
+      const [org] = await Organization.create(
+        [{
+          name: shopName,
+          ownerName,
+          phone,
+          plan: 'trial',
+          status: 'active'
+        }],
+        { session }
+      );
 
-  const token = generateToken(user._id);
+      // 2. Create Owner User inside transaction session
+      const [user] = await User.create(
+        [{
+          name: ownerName,
+          email,
+          password,
+          role: 'owner',
+          orgId: org._id,
+          branchName: 'الكل'
+        }],
+        { session }
+      );
 
-  res.status(201).json({
-    success: true,
-    token,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      shopName: org.name
-    }
-  });
+      registeredUser = user;
+      registeredOrg = org;
+    });
+
+    const token = generateToken(registeredUser._id);
+
+    res.status(201).json({
+      success: true,
+      token,
+      user: {
+        id: registeredUser._id,
+        name: registeredUser.name,
+        email: registeredUser.email,
+        role: registeredUser.role,
+        shopName: registeredOrg.name
+      }
+    });
+  } finally {
+    // Always release session resources
+    await session.endSession();
+  }
 }));
 
 // @route   POST api/auth/login

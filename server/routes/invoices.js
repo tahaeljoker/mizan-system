@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Invoice from '../models/Invoice.js';
 import Product from '../models/Product.js';
 import { protect, checkSubscription } from '../middleware/auth.js';
@@ -19,7 +20,7 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 // @route   POST api/invoices
-// @desc    Complete a POS checkout sale, create invoice, and deduct inventory stock
+// @desc    Complete a POS checkout sale, create invoice, and deduct inventory stock atomically
 // @access  Private
 router.post(
   '/',
@@ -28,60 +29,79 @@ router.post(
   asyncHandler(async (req, res) => {
     const { customer, items, discount, paymentMethod } = req.body;
 
-    if (!items || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: 'السلة فارغة، لا توجد منتجات للبيع' });
     }
 
-    let subtotal = 0;
+    const session = await mongoose.startSession();
+    let createdInvoice = null;
 
-    // 1. Validate items and check tenant-scoped stock
-    for (const item of items) {
-      const itemId = item.id || item._id || item.productId;
-      const product = await Product.findOne({ _id: itemId, orgId: req.user.orgId });
-      
-      if (!product) {
-        return res.status(404).json({ success: false, message: `المنتج (${item.name || itemId}) غير متوفر في قاعدة البيانات` });
-      }
+    try {
+      await session.withTransaction(async () => {
+        let subtotal = 0;
+        const processedItems = [];
 
-      if (product.stock < item.qty) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `عذراً، الكمية المطلوبة من (${product.name}) غير متوفرة في المخزن. المتاح: ${product.stock}` 
-        });
-      }
+        // 1. Validate items and verify stock availability INSIDE the transaction session
+        for (const item of items) {
+          const itemId = item.id || item._id || item.productId;
+          const product = await Product.findOne({ _id: itemId, orgId: req.user.orgId }).session(session);
+          
+          if (!product) {
+            const error = new Error(`المنتج (${item.name || itemId}) غير متوفر في قاعدة البيانات`);
+            error.statusCode = 404;
+            throw error;
+          }
 
-      subtotal += product.sellPrice * item.qty;
+          if (product.stock < item.qty) {
+            const error = new Error(`عذراً، الكمية المطلوبة من (${product.name}) غير متوفرة في المخزن. المتاح: ${product.stock}`);
+            error.statusCode = 400;
+            throw error;
+          }
+
+          subtotal += product.sellPrice * item.qty;
+          processedItems.push({
+            productId: product._id,
+            name: product.name,
+            qty: item.qty,
+            price: product.sellPrice
+          });
+        }
+
+        const calculatedTotal = Math.max(0, subtotal - (discount || 0));
+
+        // 2. Create the invoice document INSIDE the session
+        const [invoice] = await Invoice.create(
+          [{
+            orgId: req.user.orgId,
+            customer: customer || 'عميل نقدي',
+            cashier: req.user.name,
+            items: processedItems,
+            subtotal,
+            discount: discount || 0,
+            total: calculatedTotal,
+            paymentMethod: paymentMethod || 'كاش'
+          }],
+          { session }
+        );
+
+        createdInvoice = invoice;
+
+        // 3. Atomically deduct stock quantities from inventory INSIDE the session
+        for (const item of items) {
+          const itemId = item.id || item._id || item.productId;
+          await Product.findOneAndUpdate(
+            { _id: itemId, orgId: req.user.orgId, stock: { $gte: item.qty } },
+            { $inc: { stock: -item.qty } },
+            { session, runValidators: true }
+          );
+        }
+      });
+
+      res.status(201).json({ success: true, invoice: createdInvoice });
+    } finally {
+      // Always end session to release DB resources
+      await session.endSession();
     }
-
-    const calculatedTotal = Math.max(0, subtotal - (discount || 0));
-
-    // 2. Create the tenant-scoped invoice
-    const invoice = await Invoice.create({
-      orgId: req.user.orgId,
-      customer: customer || 'عميل نقدي',
-      cashier: req.user.name,
-      items: items.map(item => ({
-        productId: item.id || item._id || item.productId,
-        name: item.name,
-        qty: item.qty,
-        price: item.price || item.sellPrice
-      })),
-      subtotal,
-      discount: discount || 0,
-      total: calculatedTotal,
-      paymentMethod: paymentMethod || 'كاش'
-    });
-
-    // 3. Deduct stock quantities from inventory within tenant boundary
-    for (const item of items) {
-      const itemId = item.id || item._id || item.productId;
-      await Product.findOneAndUpdate(
-        { _id: itemId, orgId: req.user.orgId },
-        { $inc: { stock: -item.qty } }
-      );
-    }
-
-    res.status(201).json({ success: true, invoice });
   })
 );
 
