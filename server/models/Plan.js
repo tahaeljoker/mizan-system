@@ -50,8 +50,5 @@ const planSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Primary unique index for Plan lookup by code
-planSchema.index({ code: 1 }, { unique: true });
-
 const Plan = mongoose.model('Plan', planSchema);
 export default Plan;
