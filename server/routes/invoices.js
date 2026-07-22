@@ -2,6 +2,8 @@ import express from 'express';
 import Invoice from '../models/Invoice.js';
 import Product from '../models/Product.js';
 import { protect, checkSubscription } from '../middleware/auth.js';
+import { sanitizeBody, injectOrgId, checkOwnership } from '../middleware/tenant.js';
+import asyncHandler from '../middleware/asyncHandler.js';
 
 const router = express.Router();
 
@@ -11,33 +13,34 @@ router.use(checkSubscription);
 // @route   GET api/invoices
 // @desc    Get all invoices for this shop
 // @access  Private
-router.get('/', async (req, res) => {
-  try {
-    const invoices = await Invoice.find({ orgId: req.user.orgId }).sort({ createdAt: -1 });
-    res.json({ success: true, count: invoices.length, invoices });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'حدث خطأ أثناء تحميل الفواتير' });
-  }
-});
+router.get('/', asyncHandler(async (req, res) => {
+  const invoices = await Invoice.find({ orgId: req.user.orgId }).sort({ createdAt: -1 });
+  res.json({ success: true, count: invoices.length, invoices });
+}));
 
 // @route   POST api/invoices
 // @desc    Complete a POS checkout sale, create invoice, and deduct inventory stock
 // @access  Private
-router.post('/', async (req, res) => {
-  const { customer, items, discount, paymentMethod } = req.body;
+router.post(
+  '/',
+  sanitizeBody(),
+  injectOrgId,
+  asyncHandler(async (req, res) => {
+    const { customer, items, discount, paymentMethod } = req.body;
 
-  if (!items || items.length === 0) {
-    return res.status(400).json({ success: false, message: 'السلة فارغة، لا توجد منتجات للبيع' });
-  }
+    if (!items || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'السلة فارغة، لا توجد منتجات للبيع' });
+    }
 
-  try {
     let subtotal = 0;
 
-    // 1. Validate items and calculate subtotal
+    // 1. Validate items and check tenant-scoped stock
     for (const item of items) {
-      const product = await Product.findOne({ _id: item.id, orgId: req.user.orgId });
+      const itemId = item.id || item._id || item.productId;
+      const product = await Product.findOne({ _id: itemId, orgId: req.user.orgId });
+      
       if (!product) {
-        return res.status(404).json({ success: false, message: `المنتج ${item.name} غير متوفر في قاعدة البيانات` });
+        return res.status(404).json({ success: false, message: `المنتج (${item.name || itemId}) غير متوفر في قاعدة البيانات` });
       }
 
       if (product.stock < item.qty) {
@@ -52,16 +55,16 @@ router.post('/', async (req, res) => {
 
     const calculatedTotal = Math.max(0, subtotal - (discount || 0));
 
-    // 2. Create the invoice
+    // 2. Create the tenant-scoped invoice
     const invoice = await Invoice.create({
       orgId: req.user.orgId,
       customer: customer || 'عميل نقدي',
       cashier: req.user.name,
       items: items.map(item => ({
-        productId: item.id,
+        productId: item.id || item._id || item.productId,
         name: item.name,
         qty: item.qty,
-        price: item.sellPrice
+        price: item.price || item.sellPrice
       })),
       subtotal,
       discount: discount || 0,
@@ -69,39 +72,35 @@ router.post('/', async (req, res) => {
       paymentMethod: paymentMethod || 'كاش'
     });
 
-    // 3. Deduct stock quantities from inventory
+    // 3. Deduct stock quantities from inventory within tenant boundary
     for (const item of items) {
+      const itemId = item.id || item._id || item.productId;
       await Product.findOneAndUpdate(
-        { _id: item.id, orgId: req.user.orgId },
+        { _id: itemId, orgId: req.user.orgId },
         { $inc: { stock: -item.qty } }
       );
     }
 
     res.status(201).json({ success: true, invoice });
-  } catch (error) {
-    console.error('POS sale processing error:', error);
-    res.status(500).json({ success: false, message: 'حدث خطأ في النظام أثناء معالجة عملية البيع' });
-  }
-});
+  })
+);
 
 // @route   PUT api/invoices/:id
 // @desc    Update invoice (e.g., status, items list, total for refunds)
 // @access  Private
-router.put('/:id', async (req, res) => {
-  try {
-    const invoice = await Invoice.findOneAndUpdate(
+router.put(
+  '/:id',
+  sanitizeBody(),
+  checkOwnership({ Model: Invoice, param: 'id' }),
+  asyncHandler(async (req, res) => {
+    const updatedInvoice = await Invoice.findOneAndUpdate(
       { _id: req.params.id, orgId: req.user.orgId },
       { $set: req.body },
-      { new: true }
+      { new: true, runValidators: true }
     );
-    if (!invoice) {
-      return res.status(404).json({ success: false, message: 'الفاتورة غير موجودة' });
-    }
-    res.json({ success: true, invoice });
-  } catch (error) {
-    console.error('Invoice update error:', error);
-    res.status(500).json({ success: false, message: 'حدث خطأ أثناء تحديث الفاتورة' });
-  }
-});
+
+    res.json({ success: true, invoice: updatedInvoice });
+  })
+);
 
 export default router;
