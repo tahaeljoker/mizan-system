@@ -14,9 +14,16 @@ const organizationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // Single Source of Truth reference for Universal Licensing System
+  activeLicenseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'License',
+    default: null
+  },
+  // Retained legacy fields for 100% backward compatibility
   plan: {
     type: String,
-    enum: ['trial', 'starter', 'business', 'pro'],
+    enum: ['trial', 'starter', 'business', 'pro', 'professional', 'enterprise'],
     default: 'trial'
   },
   status: {
@@ -42,6 +49,9 @@ const organizationSchema = new mongoose.Schema({
     }
   ]
 }, { timestamps: true });
+
+// Index for frequent active license lookups
+organizationSchema.index({ activeLicenseId: 1 });
 
 const Organization = mongoose.model('Organization', organizationSchema);
 export default Organization;
