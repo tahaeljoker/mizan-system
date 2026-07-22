@@ -3,9 +3,12 @@ import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Organization from '../models/Organization.js';
+import Plan from '../models/Plan.js';
+import License from '../models/License.js';
 import { protect } from '../middleware/auth.js';
 import asyncHandler from '../middleware/asyncHandler.js';
 import { sanitizeBody } from '../middleware/tenant.js';
+import { LICENSE_CONFIG } from '../config/licensing.js';
 
 const router = express.Router();
 
@@ -16,7 +19,7 @@ const generateToken = (id) => {
 };
 
 // @route   POST api/auth/register
-// @desc    Register a new shop (Organization) and its owner atomically
+// @desc    Register a new shop (Organization), provision active Trial License, and create Owner User atomically
 // @access  Public
 router.post('/register', sanitizeBody(['orgId', '_id', '__v']), asyncHandler(async (req, res) => {
   const { shopName, ownerName, email, password, phone } = req.body;
@@ -36,19 +39,55 @@ router.post('/register', sanitizeBody(['orgId', '_id', '__v']), asyncHandler(asy
 
   try {
     await session.withTransaction(async () => {
-      // 1. Create Organization (Tenant) inside transaction session
+      // 1. Create Organization (Tenant)
       const [org] = await Organization.create(
         [{
           name: shopName,
           ownerName,
           phone,
-          plan: 'trial',
+          plan: LICENSE_CONFIG.DEFAULT_PLAN_CODE,
           status: 'active'
         }],
         { session }
       );
 
-      // 2. Create Owner User inside transaction session
+      // 2. Find Trial Plan by code
+      const trialPlan = await Plan.findOne({ code: LICENSE_CONFIG.DEFAULT_PLAN_CODE }).session(session);
+      if (!trialPlan) {
+        const error = new Error('باقة التجربة الافتراضية غير معرفة في المنظومة. يرجى التواصل مع الإدارة.');
+        error.statusCode = 500;
+        throw error;
+      }
+
+      // 3. Create Trial License calculated from LICENSE_CONFIG.TRIAL_DURATION_DAYS
+      const trialDurationMs = LICENSE_CONFIG.TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
+      const trialEndsAt = new Date(Date.now() + trialDurationMs);
+
+      const [license] = await License.create(
+        [{
+          orgId: org._id,
+          planId: trialPlan._id,
+          type: 'trial',
+          status: 'active',
+          startsAt: new Date(),
+          trialEndsAt,
+          expiresAt: trialEndsAt,
+          issuedBy: LICENSE_CONFIG.DEFAULT_ISSUER,
+          provider: LICENSE_CONFIG.DEFAULT_PROVIDER,
+          autoRenew: LICENSE_CONFIG.AUTO_RENEW
+        }],
+        { session }
+      );
+
+      // 4. Update Organization activeLicenseId
+      await Organization.updateOne(
+        { _id: org._id },
+        { $set: { activeLicenseId: license._id } },
+        { session }
+      );
+      org.activeLicenseId = license._id;
+
+      // 5. Create Owner User
       const [user] = await User.create(
         [{
           name: ownerName,
@@ -75,7 +114,8 @@ router.post('/register', sanitizeBody(['orgId', '_id', '__v']), asyncHandler(asy
         name: registeredUser.name,
         email: registeredUser.email,
         role: registeredUser.role,
-        shopName: registeredOrg.name
+        shopName: registeredOrg.name,
+        activeLicenseId: registeredOrg.activeLicenseId
       }
     });
   } finally {
@@ -127,7 +167,9 @@ router.get('/me', protect, asyncHandler(async (req, res) => {
   res.json({
     success: true,
     user: req.user,
-    organization: req.org
+    organization: req.organization || req.org,
+    license: req.license,
+    plan: req.plan
   });
 }));
 
