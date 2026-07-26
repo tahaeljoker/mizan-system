@@ -20,13 +20,21 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['owner', 'manager', 'cashier', 'warehouse'],
+    enum: ['owner', 'manager', 'cashier', 'warehouse', 'admin'],
     default: 'cashier'
+  },
+  roleId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Role'
   },
   orgId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
     required: true
+  },
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch'
   },
   branchName: {
     type: String,
@@ -34,8 +42,12 @@ const userSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'inactive'],
+    enum: ['active', 'inactive', 'deleted'],
     default: 'active'
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 
@@ -56,5 +68,5 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.models.User || mongoose.model('User', userSchema);
 export default User;
