@@ -17,8 +17,9 @@ const Expenses = () => {
     queryFn: () => apiService.finance.getExpenseCategories()
   });
 
-  const expensesList = expensesData?.expenses || expensesData || [];
-  const categories = categoriesList || [];
+  const rawExpenses = expensesData?.data || expensesData?.expenses || expensesData;
+  const expensesList = Array.isArray(rawExpenses) ? rawExpenses : [];
+  const categories = Array.isArray(categoriesList) ? categoriesList : [];
 
   const [formData, setFormData] = useState({
     notes: '',
@@ -55,7 +56,7 @@ const Expenses = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.amount) return;
+    if (!formData.amount || parseFloat(formData.amount) <= 0) return;
 
     createExpenseMutation.mutate({
       notes: formData.notes || 'مصروف عام',
@@ -109,145 +110,170 @@ const Expenses = () => {
 
         <div className="card stat-card">
           <div className="stat-info">
-            <span className="stat-title">فئات المصاريف المعتمدة</span>
-            <span className="stat-value" style={{ color: 'var(--primary)' }}>
-              {categories.length} فئات
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>مبوبة بالنظام المحاسبي</span>
+            <span className="stat-title">أنواع وبنود المصاريف</span>
+            <span className="stat-value">{categories.length} فئات</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>مرتبات، إيجار، منافع</span>
           </div>
           <div className="stat-icon primary">
-            <Check size={24} />
+            <Plus size={24} />
           </div>
         </div>
 
-        <div className="card stat-card" style={{ borderColor: 'var(--primary-glow)' }}>
+        <div className="card stat-card">
           <div className="stat-info">
-            <span className="stat-title">طريقة الخصم المباشر</span>
-            <span className="stat-value" style={{ color: 'var(--success)', fontWeight: 'bold' }}>
-              خزنة الكاش / البنك
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>توليد قيد مزدوج تلقائي (General Ledger)</span>
+            <span className="stat-title">حالة الخزينة النقدية</span>
+            <span className="stat-value" style={{ color: 'var(--success)' }}>متزنة ومحدثة</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>تحديث تلقائي</span>
           </div>
           <div className="stat-icon success">
-            <DollarSign size={24} />
+            <Check size={24} />
           </div>
         </div>
       </div>
 
       {/* Expenses Table */}
       <div className="card">
-        <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>تفاصيل المصاريف الأخيرة</h3>
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>الوصف / البيان</th>
-                <th>قيمة المصروف</th>
-                <th>فئة المصروف</th>
-                <th>طريقة الدفع</th>
-                <th>تاريخ الصرف</th>
-                <th style={{ textAlign: 'center' }}>الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loadingExpenses ? (
-                <tr><td colSpan="6" style={{ textAlign: 'center' }}>جاري تحميل المصاريف من قاعدة البيانات...</td></tr>
-              ) : expensesList.length > 0 ? (
-                expensesList.map((exp) => (
-                  <tr key={exp._id || exp.id}>
-                    <td style={{ fontWeight: '600' }}>{exp.notes || exp.name || 'مصروف عام'}</td>
-                    <td style={{ fontWeight: 'bold', color: 'var(--danger)' }}>
-                      {(exp.amount || 0).toLocaleString()} ج.م
-                    </td>
-                    <td>{exp.categoryId?.name || 'مصروفات عامة'}</td>
-                    <td>{exp.paymentMethod || 'CASH'}</td>
-                    <td>{new Date(exp.expenseDate || exp.createdAt).toLocaleDateString('ar-EG')}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button 
-                        onClick={() => handleDelete(exp._id || exp.id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
-                        title="حذف"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+        <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>سجل المصاريف المالية والتشغيلية</h3>
+
+        {loadingExpenses ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            جاري تحميل المصاريف...
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>تاريخ المصروف</th>
+                  <th>بند المصروف</th>
+                  <th>البيان والتفاصيل</th>
+                  <th>طريقة الدفع</th>
+                  <th>المبلغ</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expensesList.length > 0 ? (
+                  expensesList.map((exp) => (
+                    <tr key={exp._id || exp.id}>
+                      <td>{exp.expenseDate ? new Date(exp.expenseDate).toLocaleDateString('ar-EG') : new Date().toLocaleDateString('ar-EG')}</td>
+                      <td>
+                        <span className="badge warning">
+                          {exp.categoryId?.name || exp.category || 'مصروف عام'}
+                        </span>
+                      </td>
+                      <td>{exp.notes || exp.description || 'بدون بيان'}</td>
+                      <td>
+                        <span className="badge info">{exp.paymentMethod || 'CASH'}</span>
+                      </td>
+                      <td style={{ fontWeight: 'bold', color: 'var(--danger)' }}>
+                        {exp.amount?.toLocaleString()} ج.م
+                      </td>
+                      <td>
+                        <button
+                          className="action-btn text-danger"
+                          onClick={() => handleDelete(exp._id || exp.id)}
+                          title="حذف المصروف"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                      لا توجد مصاريف مسجلة حتى الآن.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد مصاريف مسجلة حالياً</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Add Expense Modal */}
       {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>تسجيل مصروف جديد</h3>
-              <button className="close-btn" onClick={() => setShowAddModal(false)}><X size={20} /></button>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-ar)'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 'var(--radius-lg)',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '24px',
+            direction: 'rtl'
+          }}>
+            <div className="flex justify-between align-center mb-16">
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>تسجيل مصروف جديد</h3>
+              <X size={20} style={{ cursor: 'pointer' }} onClick={() => setShowAddModal(false)} />
             </div>
+
             <form onSubmit={handleSubmit}>
               <div className="form-group mb-16">
-                <label className="form-label">البيان / الوصف *</label>
-                <input 
-                  type="text" 
-                  className="form-control"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="مثال: فاتورة كهرباء المحل لشهر يوليو"
-                  required
-                />
-              </div>
-              <div className="form-group mb-16">
-                <label className="form-label">المبلغ (ج.م) *</label>
-                <input 
-                  type="number" 
-                  className="form-control"
+                <label>مبلغ المصروف (ج.م) *</label>
+                <input
+                  type="number"
+                  step="0.01"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  placeholder="0.00"
                   required
                 />
               </div>
+
               <div className="form-group mb-16">
-                <label className="form-label">فئة المصروف</label>
-                <select 
-                  className="form-control"
+                <label>فئة المصروف</label>
+                <select
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
                 >
-                  <option value="">-- اختر فئة المصروف --</option>
-                  {categories.map(c => (
-                    <option key={c._id || c.id} value={c._id || c.id}>{c.name}</option>
+                  <option value="">اختر الفئة...</option>
+                  {categories.map((c) => (
+                    <option key={c._id} value={c._id}>{c.name}</option>
                   ))}
                 </select>
               </div>
+
               <div className="form-group mb-16">
-                <label className="form-label">طريقة الدفع</label>
-                <select 
-                  className="form-control"
+                <label>طريقة الدفع</label>
+                <select
                   value={formData.paymentMethod}
                   onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
                 >
-                  <option value="CASH">نقدية / كاش الخزنة</option>
-                  <option value="CARD">بطاقة بنكية / فيزا</option>
-                  <option value="INSTAPAY">إنستاباي</option>
+                  <option value="CASH">نقدياً (من الخزينة)</option>
+                  <option value="BANK">تحويل بنكي</option>
+                  <option value="CARD">بطاقة إلكترونية</option>
                 </select>
               </div>
+
               <div className="form-group mb-24">
-                <label className="form-label">تاريخ الصرف</label>
-                <input 
-                  type="date" 
-                  className="form-control"
-                  value={formData.expenseDate}
-                  onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
+                <label>بيان وتفاصيل المصروف</label>
+                <input
+                  type="text"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="مثال: فاتورة كهرباء شهر يوليو، إيجار الفرع..."
                 />
               </div>
-              <div className="flex gap-12 justify-end">
+
+              <div className="flex justify-end gap-12">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">حفظ المصروف</button>
+                <button type="submit" className="btn btn-primary" disabled={createExpenseMutation.isPending}>
+                  {createExpenseMutation.isPending ? 'جاري الحفظ...' : 'حفظ المصروف'}
+                </button>
               </div>
             </form>
           </div>
