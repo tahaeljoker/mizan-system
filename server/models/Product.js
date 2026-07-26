@@ -11,13 +11,29 @@ const productSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  sku: {
+    type: String,
+    trim: true,
+    default: ''
+  },
   barcode: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
+  alternateBarcodes: [{
+    type: String,
+    trim: true
+  }],
   category: {
     type: String,
-    required: true
+    required: true,
+    trim: true
+  },
+  brand: {
+    type: String,
+    default: '',
+    trim: true
   },
   costPrice: {
     type: Number,
@@ -25,7 +41,8 @@ const productSchema = new mongoose.Schema({
   },
   sellPrice: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
   wholesalePrice: {
     type: Number,
@@ -46,11 +63,53 @@ const productSchema = new mongoose.Schema({
   image: {
     type: String,
     default: null
+  },
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    default: null
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'discontinued', 'deleted'],
+    default: 'active'
+  },
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  deletedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   }
 }, { timestamps: true });
 
-// Create compound index to ensure barcode is unique per organization
-productSchema.index({ orgId: 1, barcode: 1 }, { unique: true });
+// Virtual alias for minimumStock
+productSchema.virtual('minimumStock').get(function() {
+  return this.minStock;
+});
 
-const Product = mongoose.model('Product', productSchema);
+// Indexes for high performance queries
+productSchema.index({ orgId: 1, barcode: 1 });
+productSchema.index({ orgId: 1, sku: 1 });
+productSchema.index({ orgId: 1, category: 1 });
+productSchema.index({ orgId: 1, brand: 1 });
+productSchema.index({ orgId: 1, isDeleted: 1, status: 1 });
+
+const Product = mongoose.models.Product || mongoose.model('Product', productSchema);
 export default Product;

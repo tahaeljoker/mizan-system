@@ -5,9 +5,8 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 
-import authRoutes from './routes/auth.routes.js';
-import productRoutes from '../routes/products.js';
-import invoiceRoutes from '../routes/invoices.js';
+import apiRoutes from './routes/index.js';
+import legacyProductRoutes from '../routes/products.js';
 import { errorResponse } from './utils/response.js';
 import errorHandler from '../middleware/errorHandler.js';
 
@@ -38,15 +37,12 @@ app.get('/api/v1/health', (req, res) => {
   res.json({ status: 'ok', service: 'Mizan ERP API v1', timestamp: new Date() });
 });
 
-// API Routes
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/auth', authRoutes);
+// Primary API Router (v1 and root alias)
+app.use('/api/v1', apiRoutes);
+app.use('/api', apiRoutes);
 
-app.use('/api/v1/products', productRoutes);
-app.use('/api/products', productRoutes);
-
-app.use('/api/v1/invoices', invoiceRoutes);
-app.use('/api/invoices', invoiceRoutes);
+// Fallback for legacy product endpoints if any
+app.use('/api/products-legacy', legacyProductRoutes);
 
 // Global Error Handler Middleware
 app.use((err, req, res, next) => {

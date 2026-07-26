@@ -53,3 +53,21 @@ export const authenticate = async (req, res, next) => {
 };
 
 export const protect = authenticate;
+
+/**
+ * Role Authorization Middleware
+ */
+export const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return errorResponse(
+        res,
+        `Access denied. Role '${req.user?.role || 'guest'}' is not authorized for this action.`,
+        403
+      );
+    }
+    next();
+  };
+};
+
+export const authorize = authorizeRoles;
