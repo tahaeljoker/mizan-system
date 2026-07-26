@@ -1,16 +1,28 @@
 import React, { useState } from 'react';
-import { Shield, ShoppingBag, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { ShoppingBag, Eye, EyeOff, Lock, Mail, Sparkles, UserCheck } from 'lucide-react';
 import apiService from '../services/api';
+
+const DEMO_BUTTONS = [
+  { role: 'owner', label: '👑 المالك (Owner)', email: 'owner@demo.madar.app', desc: 'تحكم كامل بجميع الموديولات' },
+  { role: 'admin', label: '🛡️ المدير (Admin)', email: 'admin@demo.madar.app', desc: 'الإدارة العامة والتقارير' },
+  { role: 'manager', label: '🏢 مدير الفرع (Manager)', desc: 'مخزون ومبيعات الفرع', email: 'manager@demo.madar.app' },
+  { role: 'accountant', label: '📊 المحاسب (Accountant)', email: 'accountant@demo.madar.app', desc: 'المالية والقيود والبنك' },
+  { role: 'cashier', label: '💰 الكاشير (Cashier)', email: 'cashier@demo.madar.app', desc: 'POS والدرج وإغلاق الشيفت' },
+  { role: 'warehouse', label: '📦 أمين المخزن (Warehouse)', email: 'warehouse@demo.madar.app', desc: 'التحويلات والجرد' },
+  { role: 'staff', label: '🔍 موظف الجرد (Staff)', email: 'staff@demo.madar.app', desc: 'فحص الأسعار والجرد' }
+];
 
 const Login = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setError('');
+    setLoading(true);
 
     try {
       const response = await apiService.auth.login(email, password);
@@ -20,36 +32,37 @@ const Login = ({ onLoginSuccess }) => {
         setError(response.message || 'خطأ في البريد الإلكتروني أو كلمة المرور!');
       }
     } catch (err) {
-      console.warn('Backend connection failed, falling back to local simulation:', err.message);
-      // Credentials matching (Offline fallback)
-      if (email === 'admin@mizan.com' && password === '01143632650taha') {
-        // Super Admin
-        const adminUser = { role: 'admin', email: 'admin@mizan.com', name: 'طه أنس (المشرف)' };
-        localStorage.setItem('mizan_user', JSON.stringify(adminUser));
-        onLoginSuccess(adminUser);
-      } else if ((email === 'shop@mizan.com' || email === 'owner@mizan.com') && password === '01143632650taha') {
-        // Demo Shop Owner
-        const shopUser = { role: 'owner', email: email, name: 'طه أنس (مالك المحل)', tenantName: 'بوتيك مودابيلا للملابس' };
+      console.warn('Backend login fallback:', err.message);
+      // Fallback for default accounts
+      if (email === 'owner@mizan.com' && password === '01143632650taha') {
+        const shopUser = { role: 'owner', email: email, name: 'طه أنس (مالك المحل)' };
         localStorage.setItem('mizan_user', JSON.stringify(shopUser));
         onLoginSuccess(shopUser);
-      } else if (email === 'manager@mizan.com' && password === '01143632650taha') {
-        // Shop Branch Manager
-        const managerUser = { role: 'manager', email: 'manager@mizan.com', name: 'سارة أحمد (مدير الفرع)' };
-        localStorage.setItem('mizan_user', JSON.stringify(managerUser));
-        onLoginSuccess(managerUser);
-      } else if (email === 'cashier@mizan.com' && password === '01143632650taha') {
-        // Cashier
-        const cashierUser = { role: 'cashier', email: 'cashier@mizan.com', name: 'سارة أحمد' };
-        localStorage.setItem('mizan_user', JSON.stringify(cashierUser));
-        onLoginSuccess(cashierUser);
-      } else if (email === 'staff@mizan.com' && password === '01143632650taha') {
-        // Inventory Staff
-        const staffUser = { role: 'staff', email: 'staff@mizan.com', name: 'كريم محمود' };
-        localStorage.setItem('mizan_user', JSON.stringify(staffUser));
-        onLoginSuccess(staffUser);
       } else {
-        setError('خطأ في البريد الإلكتروني أو كلمة المرور! يرجى المحاولة مرة أخرى.');
+        setError('خطأ في البيانات الدخول! حاول مرة أخرى.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (demoEmail) => {
+    setEmail(demoEmail);
+    setPassword('Demo@123');
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await apiService.auth.login(demoEmail, 'Demo@123');
+      if (response.success) {
+        onLoginSuccess(response.user);
+      } else {
+        setError(response.message || 'فشل تسجيل الدخول بالحساب التجريبي');
+      }
+    } catch (err) {
+      setError('فشل الاتصال بالخادم التجريبي: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -61,51 +74,40 @@ const Login = ({ onLoginSuccess }) => {
       justifyContent: 'center',
       background: 'radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.1) 0%, rgba(124, 58, 237, 0.05) 90.2%), #f8fafc',
       fontFamily: 'var(--font-ar)',
-      padding: '20px'
+      padding: '30px 20px'
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '450px',
+        maxWidth: '900px',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '24px',
         background: '#ffffff',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-lg), 0 20px 40px rgba(0, 0, 0, 0.03)',
-        padding: '40px 32px',
-        textAlign: 'center',
-        position: 'relative',
-        overflow: 'hidden'
+        boxShadow: 'var(--shadow-lg), 0 20px 40px rgba(0, 0, 0, 0.04)',
+        padding: '32px',
+        alignItems: 'start'
       }}>
-        {/* Soft decorative background circles */}
-        <div style={{
-          position: 'absolute',
-          top: '-50px',
-          right: '-50px',
-          width: '120px',
-          height: '120px',
-          borderRadius: '50%',
-          background: 'var(--primary-glow)',
-          zIndex: 0
-        }}></div>
-
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          {/* Logo / Icon */}
+        {/* Left Form Box */}
+        <div style={{ textAlign: 'center' }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: '64px',
-            height: '64px',
+            width: '60px',
+            height: '60px',
             background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
             color: '#fff',
             borderRadius: '16px',
             marginBottom: '16px',
             boxShadow: '0 8px 16px rgba(79, 70, 229, 0.2)'
           }}>
-            <ShoppingBag size={32} />
+            <ShoppingBag size={30} />
           </div>
 
-          <h1 style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>مِيزان</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '32px' }}>منصة الكاشير الذكية وإدارة المحلات السحابية</p>
+          <h1 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '6px' }}>مِدار ERP/POS</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '24px' }}>منصة الكاشير الذكية وإدارة المحلات السحابية</p>
 
           {error && (
             <div style={{
@@ -113,9 +115,9 @@ const Login = ({ onLoginSuccess }) => {
               color: 'var(--danger)',
               border: '1px solid rgba(239, 68, 68, 0.2)',
               borderRadius: '8px',
-              padding: '12px',
-              fontSize: '13px',
-              marginBottom: '20px',
+              padding: '10px 12px',
+              fontSize: '12.5px',
+              marginBottom: '16px',
               textAlign: 'right'
             }}>
               {error}
@@ -123,23 +125,23 @@ const Login = ({ onLoginSuccess }) => {
           )}
 
           <form onSubmit={handleSubmit} style={{ textAlign: 'right' }}>
-            <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label style={{ fontSize: '13.5px', fontWeight: '600' }}>البريد الإلكتروني</label>
+            <div className="form-group mb-16">
+              <label style={{ fontSize: '13px', fontWeight: '600' }}>البريد الإلكتروني</label>
               <div style={{ position: 'relative' }}>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@mizan.com"
+                  placeholder="owner@demo.madar.app"
                   style={{ paddingRight: '40px', direction: 'ltr' }}
                   required
                 />
-                <Mail size={18} style={{ position: 'absolute', top: '15px', right: '14px', color: 'var(--text-dark)' }} />
+                <Mail size={18} style={{ position: 'absolute', top: '14px', right: '14px', color: 'var(--text-muted)' }} />
               </div>
             </div>
 
-            <div className="form-group" style={{ marginBottom: '32px' }}>
-              <label style={{ fontSize: '13.5px', fontWeight: '600' }}>كلمة المرور</label>
+            <div className="form-group mb-24">
+              <label style={{ fontSize: '13px', fontWeight: '600' }}>كلمة المرور</label>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -149,63 +151,62 @@ const Login = ({ onLoginSuccess }) => {
                   style={{ paddingRight: '40px', direction: 'ltr' }}
                   required
                 />
-                <Lock size={18} style={{ position: 'absolute', top: '15px', right: '14px', color: 'var(--text-dark)' }} />
-                <button
-                  type="button"
+                <Lock size={18} style={{ position: 'absolute', top: '14px', right: '14px', color: 'var(--text-muted)' }} />
+                <div
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    top: '15px',
-                    left: '14px',
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-dark)',
-                    cursor: 'pointer',
-                    padding: 0
-                  }}
+                  style={{ position: 'absolute', top: '14px', left: '14px', cursor: 'pointer', color: 'var(--text-muted)' }}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                </div>
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{
-                width: '100%',
-                padding: '14px',
-                fontSize: '15px',
-                fontWeight: '700',
-                borderRadius: 'var(--radius-md)'
-              }}
-            >
-              تسجيل الدخول للمنصة
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '15px' }} disabled={loading}>
+              {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول للنظام'}
             </button>
           </form>
+        </div>
 
-          {/* Quick instructions / Help tags */}
-          <div style={{
-            marginTop: '32px',
-            borderTop: '1px solid var(--border)',
-            paddingTop: '20px',
-            textAlign: 'right'
-          }}>
-            <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '8px' }}>للتجربة والتحكم السريع:</h4>
-            <ul style={{ paddingRight: '20px', fontSize: '12px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <li>
-                <strong>حساب المالك (أدمن المنصة):</strong>
-                <div style={{ direction: 'ltr', textAlign: 'left', background: 'var(--bg-main)', padding: '6px', borderRadius: '4px', marginTop: '2px', fontFamily: 'monospace' }}>
-                  User: admin@mizan.com / Pass: 01143632650taha
+        {/* Right Sandbox Demo Launcher Box */}
+        <div style={{
+          background: 'var(--bg-app)',
+          borderRadius: 'var(--radius-md)',
+          padding: '24px',
+          border: '1px solid var(--border)',
+          textAlign: 'right'
+        }}>
+          <div className="flex align-center gap-8 mb-12" style={{ color: 'var(--primary)' }}>
+            <Sparkles size={20} />
+            <h3 style={{ fontSize: '16px', fontWeight: 'bold', margin: 0 }}>تجربة البيئة التفاعلية (Public Sandbox)</h3>
+          </div>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
+            اضغط بنقرة واحدة لتسجيل الدخول الفوري بأي صلاحية واستكشاف الشاشات والتقارير بأمان:
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '380px', overflowY: 'auto' }}>
+            {DEMO_BUTTONS.map((demo, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleDemoLogin(demo.email)}
+                className="btn btn-secondary"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 14px',
+                  textAlign: 'right',
+                  fontSize: '12.5px',
+                  background: '#ffffff'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 'bold', color: 'var(--text-main)' }}>{demo.label}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{demo.desc}</div>
                 </div>
-              </li>
-              <li>
-                <strong>حساب المحل (للتجربة والتطوير):</strong>
-                <div style={{ direction: 'ltr', textAlign: 'left', background: 'var(--bg-main)', padding: '6px', borderRadius: '4px', marginTop: '2px', fontFamily: 'monospace' }}>
-                  User: shop@mizan.com / Pass: 01143632650taha
-                </div>
-              </li>
-            </ul>
+                <UserCheck size={16} style={{ color: 'var(--primary)' }} />
+              </button>
+            ))}
           </div>
         </div>
       </div>

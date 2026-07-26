@@ -66,7 +66,27 @@ export const apiService = {
     }
   },
 
-  // 2. Products
+  // 2. Demo Sandbox
+  demo: {
+    getAccounts: async () => {
+      const response = await api.get('/demo/accounts');
+      return response.data.accounts || [];
+    },
+    getStatus: async () => {
+      const response = await api.get('/demo/status');
+      return response.data;
+    },
+    reset: async () => {
+      const response = await api.post('/demo/reset');
+      return response.data;
+    },
+    getInfo: async () => {
+      const response = await api.get('/demo/info');
+      return response.data;
+    }
+  },
+
+  // 3. Products
   products: {
     getAll: async (params) => {
       const response = await api.get('/products', { params });
@@ -102,7 +122,7 @@ export const apiService = {
     }
   },
 
-  // 3. Customers
+  // 4. Customers
   customers: {
     getAll: async (params) => {
       const response = await api.get('/customers', { params });
@@ -134,7 +154,7 @@ export const apiService = {
     }
   },
 
-  // 4. Suppliers
+  // 5. Suppliers
   suppliers: {
     getAll: async (params) => {
       const response = await api.get('/suppliers', { params });
@@ -166,7 +186,7 @@ export const apiService = {
     }
   },
 
-  // 5. Purchase Orders
+  // 6. Purchase Orders
   purchaseOrders: {
     getAll: async (params) => {
       const response = await api.get('/purchase-orders', { params });
@@ -198,7 +218,7 @@ export const apiService = {
     }
   },
 
-  // 6. Sales & POS
+  // 7. Sales & POS
   sales: {
     getAll: async (params) => {
       const response = await api.get('/sales', { params });
@@ -242,7 +262,7 @@ export const apiService = {
     }
   },
 
-  // 7. Shifts & Cash Registers
+  // 8. Shifts & Cash Registers
   shifts: {
     getAll: async (params) => {
       const response = await api.get('/shifts', { params });
@@ -270,7 +290,7 @@ export const apiService = {
     }
   },
 
-  // 8. Inventory & Warehouse
+  // 9. Inventory & Warehouse
   inventory: {
     getTransfers: async (params) => {
       const response = await api.get('/inventory/transfers', { params });
@@ -338,7 +358,7 @@ export const apiService = {
     }
   },
 
-  // 9. Finance & Accounting
+  // 10. Finance & Accounting
   finance: {
     getExpenseCategories: async () => {
       const response = await api.get('/finance/expense-categories');
@@ -438,7 +458,7 @@ export const apiService = {
     }
   },
 
-  // 10. Executive Dashboard & Analytics
+  // 11. Executive Dashboard & Analytics
   dashboard: {
     getOverview: async (params) => {
       const response = await api.get('/dashboard/overview', { params });
@@ -478,7 +498,7 @@ export const apiService = {
     }
   },
 
-  // 11. Workflow (Notifications, Approvals, Audit & Jobs)
+  // 12. Workflow (Notifications, Approvals, Audit & Jobs)
   workflow: {
     getNotifications: async (params) => {
       const response = await api.get('/notifications', { params });
