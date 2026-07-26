@@ -564,6 +564,70 @@ export const apiService = {
       const response = await api.get('/jobs/history');
       return response.data.history || [];
     }
+  },
+
+  // 13. SaaS Platform Client Endpoints
+  saas: {
+    registerCompany: async (companyData) => {
+      const response = await api.post('/saas/register', companyData);
+      return response.data;
+    },
+    getPlans: async () => {
+      const response = await api.get('/saas/plans');
+      return response.data.plans || [];
+    },
+    getTickets: async (params) => {
+      const response = await api.get('/saas/tickets', { params });
+      return response.data;
+    },
+    createTicket: async (data) => {
+      const response = await api.post('/saas/tickets', data);
+      return response.data.ticket;
+    },
+    replyTicket: async (id, message) => {
+      const response = await api.post(`/saas/tickets/${id}/reply`, { message });
+      return response.data.ticket;
+    },
+    getWhiteLabel: async () => {
+      const response = await api.get('/saas/white-label');
+      return response.data.config;
+    },
+    updateWhiteLabel: async (data) => {
+      const response = await api.post('/saas/white-label', data);
+      return response.data.config;
+    }
+  },
+
+  // 14. Super Admin Client Endpoints
+  super: {
+    getDashboard: async () => {
+      const response = await api.get('/super/dashboard');
+      return response.data.dashboard;
+    },
+    getCompanies: async (params) => {
+      const response = await api.get('/super/companies', { params });
+      return response.data;
+    },
+    updateCompanyStatus: async (id, status) => {
+      const response = await api.patch(`/super/companies/${id}/status`, { status });
+      return response.data.company;
+    },
+    deleteCompany: async (id) => {
+      const response = await api.delete(`/super/companies/${id}`);
+      return response.data;
+    },
+    impersonateCompany: async (id) => {
+      const response = await api.post(`/super/companies/${id}/impersonate`);
+      return response.data.ownerUser;
+    },
+    getBackups: async () => {
+      const response = await api.get('/super/backups');
+      return response.data.backups || [];
+    },
+    triggerBackup: async () => {
+      const response = await api.post('/super/backups');
+      return response.data.backup;
+    }
   }
 };
 
