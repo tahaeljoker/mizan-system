@@ -8,6 +8,7 @@ import purchaseOrderRoutes from './purchaseOrder.routes.js';
 import saleRoutes from './sale.routes.js';
 import shiftRoutes from './shift.routes.js';
 import financeRoutes from './finance.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
 import invoiceRoutes from '../../routes/invoices.js';
 
 const router = express.Router();
@@ -21,6 +22,7 @@ router.use('/purchase-orders', purchaseOrderRoutes);
 router.use('/sales', saleRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/finance', financeRoutes);
+router.use('/dashboard', dashboardRoutes);
 router.use('/invoices', invoiceRoutes);
 
 export default router;
