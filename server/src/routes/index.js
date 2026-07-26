@@ -9,6 +9,7 @@ import saleRoutes from './sale.routes.js';
 import shiftRoutes from './shift.routes.js';
 import financeRoutes from './finance.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
+import workflowRoutes from './workflow.routes.js';
 import invoiceRoutes from '../../routes/invoices.js';
 
 const router = express.Router();
@@ -23,6 +24,10 @@ router.use('/sales', saleRoutes);
 router.use('/shifts', shiftRoutes);
 router.use('/finance', financeRoutes);
 router.use('/dashboard', dashboardRoutes);
+router.use('/workflow', workflowRoutes);
+
+// Direct top-level route mounts for workflow endpoints
+router.use('/', workflowRoutes);
 router.use('/invoices', invoiceRoutes);
 
 export default router;
