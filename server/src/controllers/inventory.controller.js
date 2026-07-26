@@ -6,6 +6,7 @@ import {
   blindCountSchema,
   managerReviewSchema,
   manualAdjustmentSchema,
+  bulkAdjustSchema,
   createTransferSchema,
   receiveTransferSchema
 } from '../validators/inventory.validator.js';
@@ -49,7 +50,7 @@ export const getSessionById = async (req, res) => {
 
 export const createSession = async (req, res) => {
   try {
-    const validatedData = createSessionSchema.parse(req.body);
+    const validatedData = createSessionSchema.parse(req.body || {});
     const session = await inventoryService.createSession(validatedData, req.user, req);
     return successResponse(res, { session }, 'Inventory count session created successfully', 201);
   } catch (error) {
@@ -58,6 +59,16 @@ export const createSession = async (req, res) => {
     }
     const statusCode = error.statusCode || 400;
     return errorResponse(res, error.message || 'Failed to create session', statusCode);
+  }
+};
+
+export const startCounting = async (req, res) => {
+  try {
+    const session = await inventoryService.startCounting(req.params.id, req.user, req);
+    return successResponse(res, { session }, 'Stock count status changed to COUNTING', 200);
+  } catch (error) {
+    const statusCode = error.statusCode || 400;
+    return errorResponse(res, error.message || 'Failed to start counting', statusCode);
   }
 };
 
@@ -89,13 +100,13 @@ export const submitBlindCount = async (req, res) => {
   try {
     const validatedData = blindCountSchema.parse(req.body);
     const session = await inventoryService.submitBlindCount(req.params.id, validatedData.items, req.user, req);
-    return successResponse(res, { session }, 'Blind count submitted successfully for manager review', 200);
+    return successResponse(res, { session }, 'Count submitted successfully for review', 200);
   } catch (error) {
     if (error instanceof ZodError) {
       return errorResponse(res, 'Validation failed', 400, formatZodErrors(error));
     }
     const statusCode = error.statusCode || 400;
-    return errorResponse(res, error.message || 'Failed to submit blind count', statusCode);
+    return errorResponse(res, error.message || 'Failed to submit count', statusCode);
   }
 };
 
@@ -134,7 +145,7 @@ export const rejectSession = async (req, res) => {
 };
 
 /* ==========================================================================
-   2. MANUAL STOCK ADJUSTMENT & REPORTS
+   2. MANUAL & BULK ADJUSTMENT & REPORTS
    ========================================================================== */
 
 export const manualAdjustment = async (req, res) => {
@@ -148,6 +159,20 @@ export const manualAdjustment = async (req, res) => {
     }
     const statusCode = error.statusCode || 400;
     return errorResponse(res, error.message || 'Stock adjustment failed', statusCode);
+  }
+};
+
+export const bulkAdjust = async (req, res) => {
+  try {
+    const validatedData = bulkAdjustSchema.parse(req.body);
+    const results = await inventoryService.bulkAdjust(validatedData, req.user, req);
+    return successResponse(res, { adjustments: results }, 'Bulk stock adjustment applied successfully', 200);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return errorResponse(res, 'Validation failed', 400, formatZodErrors(error));
+    }
+    const statusCode = error.statusCode || 400;
+    return errorResponse(res, error.message || 'Bulk stock adjustment failed', statusCode);
   }
 };
 
@@ -196,6 +221,16 @@ export const getOutOfStock = async (req, res) => {
   }
 };
 
+export const getInventoryReport = async (req, res) => {
+  try {
+    const report = await inventoryService.getInventoryReport(req.query, req.user);
+    return successResponse(res, { report }, 'Inventory report fetched successfully', 200);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return errorResponse(res, error.message || 'Failed to fetch inventory report', statusCode);
+  }
+};
+
 /* ==========================================================================
    3. BRANCH STOCK TRANSFERS
    ========================================================================== */
@@ -239,6 +274,16 @@ export const createTransfer = async (req, res) => {
   }
 };
 
+export const dispatchTransfer = async (req, res) => {
+  try {
+    const transfer = await inventoryService.dispatchTransfer(req.params.id, req.user, req);
+    return successResponse(res, { transfer }, 'Stock transfer dispatched and marked IN_TRANSIT', 200);
+  } catch (error) {
+    const statusCode = error.statusCode || 400;
+    return errorResponse(res, error.message || 'Failed to dispatch transfer', statusCode);
+  }
+};
+
 export const approveTransfer = async (req, res) => {
   try {
     const transfer = await inventoryService.approveTransfer(req.params.id, req.user, req);
@@ -263,12 +308,12 @@ export const receiveTransfer = async (req, res) => {
   }
 };
 
-export const rejectTransfer = async (req, res) => {
+export const cancelTransfer = async (req, res) => {
   try {
-    const transfer = await inventoryService.rejectTransfer(req.params.id, req.body?.reason || '', req.user, req);
-    return successResponse(res, { transfer }, 'Stock transfer rejected', 200);
+    const transfer = await inventoryService.cancelTransfer(req.params.id, req.body?.reason || '', req.user, req);
+    return successResponse(res, { transfer }, 'Stock transfer cancelled', 200);
   } catch (error) {
     const statusCode = error.statusCode || 400;
-    return errorResponse(res, error.message || 'Failed to reject transfer', statusCode);
+    return errorResponse(res, error.message || 'Failed to cancel transfer', statusCode);
   }
 };

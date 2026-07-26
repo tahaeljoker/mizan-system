@@ -43,8 +43,8 @@ const stockTransferSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['CREATED', 'APPROVED', 'SENT', 'RECEIVED', 'REJECTED'],
-    default: 'CREATED'
+    enum: ['DRAFT', 'PENDING', 'APPROVED', 'IN_TRANSIT', 'SENT', 'RECEIVED', 'CANCELLED', 'REJECTED'],
+    default: 'DRAFT'
   },
   items: [stockTransferItemSchema],
   notes: {
@@ -55,13 +55,24 @@ const stockTransferSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  dispatchedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   approvedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
+    default: null
   },
   receivedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
+    default: null
+  },
+  dispatchedAt: {
+    type: Date,
+    default: null
   },
   approvedAt: {
     type: Date,

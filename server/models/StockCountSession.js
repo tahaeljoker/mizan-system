@@ -51,8 +51,8 @@ const stockCountSessionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['DRAFT', 'COUNTING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'],
-    default: 'DRAFT'
+    enum: ['OPEN', 'DRAFT', 'COUNTING', 'REVIEW', 'UNDER_REVIEW', 'APPROVED', 'CLOSED', 'REJECTED'],
+    default: 'OPEN'
   },
   items: [stockCountItemSchema],
   notes: {

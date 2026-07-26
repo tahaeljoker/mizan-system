@@ -40,6 +40,12 @@ export const manualAdjustmentSchema = z.object({
   reference: z.string().optional().default('')
 });
 
+export const bulkAdjustSchema = z.array(z.object({
+  productId: z.string({ required_error: 'معرف المنتج مطلوب' }),
+  quantity: z.coerce.number({ required_error: 'الكمية مطلوبة' }),
+  reason: z.string().optional().default('')
+}), { required_error: 'قائمة تعديل المخزون مطلوبة' }).min(1, 'يجب تحديد عنصر واحد على الأقل للتعديل');
+
 export const createTransferSchema = z.object({
   fromBranchId: z.string({ required_error: 'فرع المصدر مطلوب' }),
   toBranchId: z.string({ required_error: 'فرع الوجهة مطلوب' }),
