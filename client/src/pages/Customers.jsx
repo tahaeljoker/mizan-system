@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit, Trash2, X, Phone, Mail, Award, DollarSign, Coins } from 'lucide-react';
-import { customers as initialCustomers } from '../data/mockData';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Edit, Trash2, X, Phone, Mail, DollarSign, Coins } from 'lucide-react';
+import apiService from '../services/api';
 
 const Customers = () => {
-  // Sync customers list with localStorage
-  const [customersList, setCustomersList] = useState(() => {
-    return JSON.parse(localStorage.getItem('mizan_customers')) || initialCustomers;
-  });
-
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
@@ -16,12 +13,38 @@ const Customers = () => {
     name: '',
     phone: '',
     email: '',
-    points: '0'
+    loyaltyPoints: '0'
   });
 
-  const filteredCustomers = customersList.filter(c => 
-    c.name.includes(searchQuery) || c.phone.includes(searchQuery) || (c.email && c.email.includes(searchQuery))
-  );
+  const { data: customersData, isLoading } = useQuery({
+    queryKey: ['customers', searchQuery],
+    queryFn: () => apiService.customers.getAll({ search: searchQuery })
+  });
+
+  const customersList = customersData?.customers || customersData || [];
+
+  const createMutation = useMutation({
+    mutationFn: (data) => apiService.customers.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setShowModal(false);
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => apiService.customers.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setShowModal(false);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => apiService.customers.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }
+  });
 
   const openAddModal = () => {
     setEditingCustomer(null);
@@ -29,7 +52,7 @@ const Customers = () => {
       name: '',
       phone: '',
       email: '',
-      points: '0'
+      loyaltyPoints: '0'
     });
     setShowModal(true);
   };
@@ -40,16 +63,14 @@ const Customers = () => {
       name: customer.name,
       phone: customer.phone,
       email: customer.email || '',
-      points: customer.points.toString()
+      loyaltyPoints: (customer.loyaltyPoints || customer.points || 0).toString()
     });
     setShowModal(true);
   };
 
   const handleDelete = (id) => {
     if (window.confirm('هل تريد حذف العميل بالفعل؟')) {
-      const updated = customersList.filter(c => c.id !== id);
-      setCustomersList(updated);
-      localStorage.setItem('mizan_customers', JSON.stringify(updated));
+      deleteMutation.mutate(id);
     }
   };
 
@@ -61,32 +82,25 @@ const Customers = () => {
       name: formData.name,
       phone: formData.phone,
       email: formData.email,
-      points: parseInt(formData.points) || 0
+      loyaltyPoints: parseInt(formData.loyaltyPoints) || 0
     };
 
-    let updated = [];
     if (editingCustomer) {
-      updated = customersList.map(c => c.id === editingCustomer.id ? { ...c, ...payload } : c);
+      updateMutation.mutate({ id: editingCustomer._id || editingCustomer.id, data: payload });
     } else {
-      updated = [...customersList, { id: 'c' + (customersList.length + 1), ...payload, balance: 0 }];
+      createMutation.mutate(payload);
     }
-    setCustomersList(updated);
-    localStorage.setItem('mizan_customers', JSON.stringify(updated));
-    setShowModal(false);
   };
 
-  // Log a customer paying their debt / credit payment
-  const handleSettlePayment = (customerId) => {
-    const customer = customersList.find(c => c.id === customerId);
-    if (!customer) return;
-
-    if (customer.balance <= 0) {
+  const handleSettlePayment = async (customer) => {
+    const balance = customer.balance || 0;
+    if (balance <= 0) {
       alert('ممتاز! هذا العميل لا توجد عليه أي ديون لتسديدها حالياً.');
       return;
     }
 
-    const payInput = prompt(`تسديد ديون العميل: ${customer.name}\nالمديونية الحالية: ${customer.balance} ج.م\nالرجاء إدخال القيمة المدفوعة نقداً (ج.م):`);
-    if (payInput === null) return; // Cancelled
+    const payInput = prompt(`تسديد ديون العميل: ${customer.name}\nالمديونية الحالية: ${balance} ج.م\nالرجاء إدخال القيمة المدفوعة نقداً (ج.م):`);
+    if (payInput === null) return;
 
     const payAmount = parseFloat(payInput) || 0;
     if (payAmount <= 0) {
@@ -94,29 +108,31 @@ const Customers = () => {
       return;
     }
 
-    if (payAmount > customer.balance) {
+    if (payAmount > balance) {
       alert('لا يمكن تسديد مبلغ أكبر من قيمة الدين الفعلي!');
       return;
     }
 
-    const updated = customersList.map(c => {
-      if (c.id === customerId) {
-        return { ...c, balance: Math.max(0, c.balance - payAmount) };
-      }
-      return c;
-    });
-
-    setCustomersList(updated);
-    localStorage.setItem('mizan_customers', JSON.stringify(updated));
-    alert(`تم تسجيل تسوية الديون بنجاح! المبلغ المسدد: ${payAmount} ج.م. المديونية المتبقية: ${customer.balance - payAmount} ج.م ✅`);
+    try {
+      await apiService.finance.recordCustomerPayment({
+        customerId: customer._id || customer.id,
+        amount: payAmount,
+        paymentMethod: 'CASH',
+        notes: 'تسوية حساب عميل من لوحة العملاء'
+      });
+      alert(`تم تسجيل تسوية الديون بنجاح! المبلغ المسدد: ${payAmount} ج.م ✅`);
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    } catch (err) {
+      alert('حدث خطأ في التسوية: ' + err.message);
+    }
   };
 
   return (
     <div>
       <div className="flex justify-between align-center mb-24">
         <div>
-          <h1 style={{ fontSize: '28px' }}>إدارة العملاء</h1>
-          <p style={{ color: 'var(--text-muted)' }}>لوحة المبيعات الآجلة، برامج الولاء ونقاط المكافآت لعملاء المحل.</p>
+          <h1 style={{ fontSize: '28px' }}>إدارة العملاء والديون والولاء</h1>
+          <p style={{ color: 'var(--text-muted)' }}>لوحة الحسابات الآجلة وبرامج الولاء ونقاط المكافآت.</p>
         </div>
         <button className="btn btn-primary" onClick={openAddModal}>
           <Plus size={18} />
@@ -129,7 +145,7 @@ const Customers = () => {
           <Search size={18} />
           <input 
             type="text" 
-            placeholder="البحث باسم العميل أو رقم التليفون لفرز الحسابات المديرة..." 
+            placeholder="البحث باسم العميل أو رقم التليفون لفرز الحسابات..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -137,7 +153,7 @@ const Customers = () => {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>قائمة العملاء المشتركين بالمتجر</h3>
+        <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>قائمة العملاء المشتركين</h3>
         <div className="table-container">
           <table>
             <thead>
@@ -151,130 +167,104 @@ const Customers = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.map((c) => (
-                <tr key={c.id}>
-                  <td style={{ fontWeight: '600' }}>{c.name}</td>
-                  <td>
-                    <div className="flex align-center gap-8" style={{ direction: 'ltr', justifyContent: 'flex-end' }}>
-                      <span>{c.phone}</span>
-                      <Phone size={14} style={{ color: 'var(--text-muted)' }} />
-                    </div>
-                  </td>
-                  <td>
-                    {c.email ? (
-                      <div className="flex align-center gap-8">
-                        <Mail size={14} style={{ color: 'var(--text-muted)' }} />
-                        <span>{c.email}</span>
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-dark)' }}>غير متوفر</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="flex align-center gap-8" style={{ color: 'var(--warning)', fontWeight: 'bold' }}>
-                      <Award size={16} />
-                      <span>{c.points} نقطة</span>
-                    </div>
-                  </td>
-                  <td>
-                    {c.balance > 0 ? (
-                      <span className="text-danger" style={{ fontWeight: 'bold' }}>
-                        عليه ديون: {c.balance.toLocaleString()} ج.م
+              {isLoading ? (
+                <tr><td colSpan="6" style={{ textAlign: 'center' }}>جاري تحميل العملاء من قاعدة البيانات...</td></tr>
+              ) : customersList.length > 0 ? (
+                customersList.map((customer) => (
+                  <tr key={customer._id || customer.id}>
+                    <td style={{ fontWeight: 'bold' }}>{customer.name}</td>
+                    <td><Phone size={14} style={{ marginLeft: '4px', verticalAlign: 'middle' }} /> {customer.phone}</td>
+                    <td><Mail size={14} style={{ marginLeft: '4px', verticalAlign: 'middle' }} /> {customer.email || 'غير مسجل'}</td>
+                    <td>
+                      <span className="badge badge-warning flex align-center gap-4" style={{ width: 'fit-content' }}>
+                        <Coins size={14} />
+                        {customer.loyaltyPoints || customer.points || 0} نقطة
                       </span>
-                    ) : (
-                      <span className="text-success" style={{ fontWeight: 'bold' }}>
-                        لا توجد مستحقات
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="flex align-center justify-between" style={{ width: '130px', margin: '0 auto', gap: '8px' }}>
-                      {c.balance > 0 && (
-                        <button 
-                          onClick={() => handleSettlePayment(c.id)}
-                          className="btn btn-secondary" 
-                          style={{ padding: '6px 10px', fontSize: '11px', display: 'flex', gap: '4px', background: 'var(--success-glow)', color: 'var(--success)', border: '1px solid var(--success)' }}
-                          title="تسديد المديونية"
-                        >
-                          <Coins size={12} />
-                          <span>تسديد</span>
+                    </td>
+                    <td style={{ fontWeight: 'bold', color: (customer.balance || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                      {(customer.balance || 0).toLocaleString()} ج.م
+                    </td>
+                    <td>
+                      <div className="flex gap-8 justify-center">
+                        {(customer.balance || 0) > 0 && (
+                          <button 
+                            className="btn btn-secondary btn-sm" 
+                            style={{ color: 'var(--success)', borderColor: 'var(--success)' }}
+                            onClick={() => handleSettlePayment(customer)}
+                            title="تسديد مديونية"
+                          >
+                            <DollarSign size={14} />
+                            <span>تسديد دين</span>
+                          </button>
+                        )}
+                        <button className="btn btn-secondary btn-sm" onClick={() => openEditModal(customer)}>
+                          <Edit size={14} />
                         </button>
-                      )}
-                      <button 
-                        onClick={() => openEditModal(c)}
-                        style={{ background: 'none', border: 'none', color: 'var(--info)', cursor: 'pointer' }}
-                        title="تعديل"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(c.id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
-                        title="حذف"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        <button className="btn btn-secondary btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(customer._id || customer.id)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>لا يوجد عملاء مسجلون حالياً</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3>{editingCustomer ? 'تعديل بيانات عميل' : 'تسجيل عميل جديد'}</h3>
-              <X className="modal-close" onClick={() => setShowModal(false)} />
+              <h3>{editingCustomer ? 'تعديل بيانات عميل' : 'إضافة عميل جديد'}</h3>
+              <button className="close-btn" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
-
             <form onSubmit={handleSave}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="form-group">
-                  <label>اسم العميل الثنائي/الثلاثي *</label>
-                  <input 
-                    type="text" 
-                    value={formData.name} 
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                    required 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>رقم هاتف العميل *</label>
-                  <input 
-                    type="text" 
-                    value={formData.phone} 
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
-                    required 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>البريد الإلكتروني (اختياري)</label>
-                  <input 
-                    type="email" 
-                    value={formData.email} 
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>رصيد نقاط الترحيب</label>
-                  <input 
-                    type="number" 
-                    value={formData.points} 
-                    onChange={(e) => setFormData({ ...formData, points: e.target.value })} 
-                  />
-                </div>
+              <div className="form-group mb-16">
+                <label className="form-label">اسم العميل بالكامل *</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required 
+                />
               </div>
-
-              <div className="modal-footer">
+              <div className="form-group mb-16">
+                <label className="form-label">رقم التليفون *</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required 
+                />
+              </div>
+              <div className="form-group mb-16">
+                <label className="form-label">البريد الإلكتروني (اختياري)</label>
+                <input 
+                  type="email" 
+                  className="form-control" 
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              <div className="form-group mb-24">
+                <label className="form-label">نقاط الولاء المبدئية</label>
+                <input 
+                  type="number" 
+                  className="form-control" 
+                  value={formData.loyaltyPoints}
+                  onChange={(e) => setFormData({ ...formData, loyaltyPoints: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-12 justify-end">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">حفظ</button>
+                <button type="submit" className="btn btn-primary">حفظ البيانات</button>
               </div>
             </form>
           </div>

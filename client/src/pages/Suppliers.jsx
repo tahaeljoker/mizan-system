@@ -1,30 +1,59 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Edit, Trash2, X, Phone, User, DollarSign } from 'lucide-react';
-import { suppliers as initialSuppliers } from '../data/mockData';
+import apiService from '../services/api';
 
 const Suppliers = () => {
-  const [suppliersList, setSuppliersList] = useState(initialSuppliers);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   
   const [formData, setFormData] = useState({
     name: '',
+    company: '',
     phone: '',
-    contact: '',
-    balance: ''
+    contactPerson: '',
+    balance: '0'
   });
 
-  const filteredSuppliers = suppliersList.filter(s => 
-    s.name.includes(searchQuery) || s.phone.includes(searchQuery) || s.contact.includes(searchQuery)
-  );
+  const { data: suppliersData, isLoading } = useQuery({
+    queryKey: ['suppliers', searchQuery],
+    queryFn: () => apiService.suppliers.getAll({ search: searchQuery })
+  });
+
+  const suppliersList = suppliersData?.suppliers || suppliersData || [];
+
+  const createMutation = useMutation({
+    mutationFn: (data) => apiService.suppliers.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      setShowModal(false);
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => apiService.suppliers.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+      setShowModal(false);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => apiService.suppliers.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    }
+  });
 
   const openAddModal = () => {
     setEditingSupplier(null);
     setFormData({
       name: '',
+      company: '',
       phone: '',
-      contact: '',
+      contactPerson: '',
       balance: '0'
     });
     setShowModal(true);
@@ -34,44 +63,75 @@ const Suppliers = () => {
     setEditingSupplier(supplier);
     setFormData({
       name: supplier.name,
+      company: supplier.company || supplier.name,
       phone: supplier.phone,
-      contact: supplier.contact,
-      balance: supplier.balance.toString()
+      contactPerson: supplier.contactPerson || supplier.contact || '',
+      balance: (supplier.balance || 0).toString()
     });
     setShowModal(true);
   };
 
   const handleDelete = (id) => {
     if (window.confirm('هل أنت متأكد من حذف هذا المورد؟')) {
-      setSuppliersList(suppliersList.filter(s => s.id !== id));
+      deleteMutation.mutate(id);
     }
   };
 
   const handleSave = (e) => {
     e.preventDefault();
-    if (!formData.name) return;
+    if (!formData.name || !formData.phone) return;
 
     const payload = {
       name: formData.name,
+      company: formData.company || formData.name,
       phone: formData.phone,
-      contact: formData.contact,
+      contactPerson: formData.contactPerson,
       balance: parseFloat(formData.balance) || 0
     };
 
     if (editingSupplier) {
-      setSuppliersList(suppliersList.map(s => s.id === editingSupplier.id ? { ...s, ...payload } : s));
+      updateMutation.mutate({ id: editingSupplier._id || editingSupplier.id, data: payload });
     } else {
-      setSuppliersList([...suppliersList, { id: 'sup' + (suppliersList.length + 1), ...payload }]);
+      createMutation.mutate(payload);
     }
-    setShowModal(false);
+  };
+
+  const handleSettleSupplier = async (supplier) => {
+    const balance = supplier.balance || 0;
+    if (balance <= 0) {
+      alert('لا تترتب أي مستحقات مالية واجبة الدفع لـ هذا المورد حالياً.');
+      return;
+    }
+
+    const payInput = prompt(`سداد مستحقات المورد: ${supplier.name}\nالمستحق الدفع: ${balance} ج.م\nالرجاء إدخال المبلغ المدفوع (ج.م):`);
+    if (payInput === null) return;
+
+    const payAmount = parseFloat(payInput) || 0;
+    if (payAmount <= 0) {
+      alert('من فضلك أدخل مبلغ سداد صحيح!');
+      return;
+    }
+
+    try {
+      await apiService.finance.recordSupplierPayment({
+        supplierId: supplier._id || supplier.id,
+        amount: payAmount,
+        paymentMethod: 'CASH',
+        notes: 'سداد مستحقات مورد'
+      });
+      alert(`تم تسجيل سداد المستحقات بنجاح! المبلغ المدفوع: ${payAmount} ج.م ✅`);
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    } catch (err) {
+      alert('حدث خطأ في التسوية: ' + err.message);
+    }
   };
 
   return (
     <div>
       <div className="flex justify-between align-center mb-24">
         <div>
-          <h1 style={{ fontSize: '28px' }}>إدارة الموردين</h1>
-          <p style={{ color: 'var(--text-muted)' }}>قائمة بجميع مصانع ومستوردي الملابس والشركات التي تتعامل معها.</p>
+          <h1 style={{ fontSize: '28px' }}>إدارة الموردين والمصانع</h1>
+          <p style={{ color: 'var(--text-muted)' }}>قائمة بجميع مصانع ومستوردي المنتجات والشركات التي تتعامل معها.</p>
         </div>
         <button className="btn btn-primary" onClick={openAddModal}>
           <Plus size={18} />
@@ -84,7 +144,7 @@ const Suppliers = () => {
           <Search size={18} />
           <input 
             type="text" 
-            placeholder="البحث باسم المورد، الهاتف أو المسؤول..." 
+            placeholder="البحث باسم المورد، الشركة، أو رقم الهاتف..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -96,118 +156,131 @@ const Suppliers = () => {
           <table>
             <thead>
               <tr>
-                <th>اسم الشركة / المورد</th>
+                <th>اسم المورد / الشركة</th>
                 <th>الهاتف</th>
                 <th>الشخص المسؤول</th>
-                <th>الحساب المستحق لنا / علينا</th>
+                <th>المستحقات الحالية (علينا)</th>
                 <th style={{ textAlign: 'center' }}>الإجراءات</th>
               </tr>
             </thead>
             <tbody>
-              {filteredSuppliers.map((s) => (
-                <tr key={s.id}>
-                  <td style={{ fontWeight: '600' }}>{s.name}</td>
-                  <td>
-                    <div className="flex align-center gap-8" style={{ direction: 'ltr', justifyContent: 'flex-end' }}>
-                      <span>{s.phone}</span>
-                      <Phone size={14} style={{ color: 'var(--text-muted)' }} />
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex align-center gap-8">
-                      <User size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span>{s.contact}</span>
-                    </div>
-                  </td>
-                  <td>
-                    {s.balance < 0 ? (
-                      <span className="text-danger" style={{ fontWeight: 'bold' }}>
-                        مستحق علينا: {Math.abs(s.balance).toLocaleString()} ج.م
-                      </span>
-                    ) : s.balance > 0 ? (
-                      <span className="text-success" style={{ fontWeight: 'bold' }}>
-                        مستحق لنا: {s.balance.toLocaleString()} ج.م
-                      </span>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>0 ج.م</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="flex align-center justify-between" style={{ width: '80px', margin: '0 auto' }}>
-                      <button 
-                        onClick={() => openEditModal(s)}
-                        style={{ background: 'none', border: 'none', color: 'var(--info)', cursor: 'pointer' }}
-                        title="تعديل"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(s.id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
-                        title="حذف"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {isLoading ? (
+                <tr><td colSpan="5" style={{ textAlign: 'center' }}>جاري تحميل الموردين من قاعدة البيانات...</td></tr>
+              ) : suppliersList.length > 0 ? (
+                suppliersList.map((s) => (
+                  <tr key={s._id || s.id}>
+                    <td style={{ fontWeight: '600' }}>{s.name} {s.company && s.company !== s.name ? `(${s.company})` : ''}</td>
+                    <td>
+                      <div className="flex align-center gap-8" style={{ direction: 'ltr', justifyContent: 'flex-end' }}>
+                        <span>{s.phone}</span>
+                        <Phone size={14} style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                    </td>
+                    <td>
+                      <div className="flex align-center gap-8">
+                        <User size={14} style={{ color: 'var(--text-muted)' }} />
+                        <span>{s.contactPerson || s.contact || 'غير مسجل'}</span>
+                      </div>
+                    </td>
+                    <td>
+                      {(s.balance || 0) > 0 ? (
+                        <span className="text-danger" style={{ fontWeight: 'bold' }}>
+                          مستحق للمورد: {(s.balance || 0).toLocaleString()} ج.م
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>0 ج.م</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="flex align-center justify-center gap-8">
+                        {(s.balance || 0) > 0 && (
+                          <button 
+                            className="btn btn-secondary btn-sm" 
+                            style={{ color: 'var(--success)', borderColor: 'var(--success)' }}
+                            onClick={() => handleSettleSupplier(s)}
+                            title="سداد مستحقات"
+                          >
+                            <DollarSign size={14} />
+                            <span>سداد</span>
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => openEditModal(s)}
+                          style={{ background: 'none', border: 'none', color: 'var(--info)', cursor: 'pointer' }}
+                          title="تعديل"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(s._id || s.id)}
+                          style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
+                          title="حذف"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>لا يوجد موردون مسجلون حالياً</td></tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
+      {/* Modal */}
       {showModal && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
               <h3>{editingSupplier ? 'تعديل بيانات مورد' : 'إضافة مورد جديد'}</h3>
-              <X className="modal-close" onClick={() => setShowModal(false)} />
+              <button className="close-btn" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
-
             <form onSubmit={handleSave}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="form-group">
-                  <label>اسم المورد (اسم الشركة/المصنع) *</label>
-                  <input 
-                    type="text" 
-                    value={formData.name} 
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                    required 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>رقم الهاتف للتواصل</label>
-                  <input 
-                    type="text" 
-                    value={formData.phone} 
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>اسم المسؤول (الشخص المفوض)</label>
-                  <input 
-                    type="text" 
-                    value={formData.contact} 
-                    onChange={(e) => setFormData({ ...formData, contact: e.target.value })} 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>الحساب الابتدائي المتبادل (ادخل قيمة سالبة إذا كنت مدين للمورد)</label>
-                  <input 
-                    type="number" 
-                    value={formData.balance} 
-                    onChange={(e) => setFormData({ ...formData, balance: e.target.value })} 
-                  />
-                </div>
+              <div className="form-group mb-16">
+                <label className="form-label">اسم المورد *</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required 
+                />
               </div>
-
-              <div className="modal-footer">
+              <div className="form-group mb-16">
+                <label className="form-label">اسم الشركة / المصنع *</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  placeholder="إذا كان نفس الاسم اتركه مطابقاً"
+                />
+              </div>
+              <div className="form-group mb-16">
+                <label className="form-label">رقم الهاتف *</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required 
+                />
+              </div>
+              <div className="form-group mb-16">
+                <label className="form-label">الشخص المسؤول (Contact Person)</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  value={formData.contactPerson}
+                  onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-12 justify-end">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">حفظ</button>
+                <button type="submit" className="btn btn-primary">حفظ البيانات</button>
               </div>
             </form>
           </div>
