@@ -11,6 +11,11 @@ const inventoryTransactionSchema = new mongoose.Schema({
     ref: 'Product',
     required: true
   },
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    default: null
+  },
   type: {
     type: String,
     enum: ['SALE', 'RETURN', 'PURCHASE', 'ADJUSTMENT', 'TRANSFER_IN', 'TRANSFER_OUT', 'STOCKTAKE'],
@@ -36,6 +41,10 @@ const inventoryTransactionSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  referenceType: {
+    type: String,
+    default: ''
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -43,6 +52,7 @@ const inventoryTransactionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 inventoryTransactionSchema.index({ orgId: 1, productId: 1, createdAt: -1 });
+inventoryTransactionSchema.index({ orgId: 1, branchId: 1, createdAt: -1 });
 
 const InventoryTransaction = mongoose.models.InventoryTransaction || mongoose.model('InventoryTransaction', inventoryTransactionSchema);
 export default InventoryTransaction;
