@@ -8,21 +8,37 @@ import dotenv from 'dotenv';
 import apiRoutes from './routes/index.js';
 import legacyProductRoutes from '../routes/products.js';
 import { errorResponse } from './utils/response.js';
+import { mongoSanitize } from './middleware/sanitize.middleware.js';
+import { logger } from './middleware/logger.middleware.js';
 import errorHandler from '../middleware/errorHandler.js';
 
 dotenv.config();
 
 const app = express();
 
+// Suppress Express Server Fingerprint Signature
+app.disable('x-powered-by');
+
 // Security & Core Middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Managed at gateway level
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors({
-  origin: true,
+  origin: process.env.CORS_ORIGIN || true,
   credentials: true
 }));
+
 app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// NoSQL Query Injection Protection
+app.use(mongoSanitize);
+
+// Request Audit & Production Logging
+app.use(logger);
 
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
@@ -30,19 +46,34 @@ if (process.env.NODE_ENV !== 'test') {
 
 // Health Check Routes
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Mizan ERP Backend', timestamp: new Date() });
+  res.json({
+    status: 'ok',
+    service: 'Mizan ERP Backend',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date()
+  });
 });
 
 app.get('/api/v1/health', (req, res) => {
-  res.json({ status: 'ok', service: 'Mizan ERP API v1', timestamp: new Date() });
+  res.json({
+    status: 'ok',
+    service: 'Mizan ERP API v1',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date()
+  });
 });
 
 // Primary API Router (v1 and root alias)
 app.use('/api/v1', apiRoutes);
 app.use('/api', apiRoutes);
 
-// Fallback for legacy product endpoints if any
+// Fallback for legacy product endpoints
 app.use('/api/products-legacy', legacyProductRoutes);
+
+// 404 Handler
+app.use((req, res, next) => {
+  return errorResponse(res, `المسار المطلوب غير موجود: ${req.originalUrl}`, 404);
+});
 
 // Global Error Handler Middleware
 app.use((err, req, res, next) => {
@@ -63,7 +94,11 @@ app.use((err, req, res, next) => {
   }
 
   const statusCode = err.statusCode || err.status || 500;
-  return errorResponse(res, err.message || 'Internal server error', statusCode);
+  const message = process.env.NODE_ENV === 'production' && statusCode === 500
+    ? 'حدث خطأ داخلي في الخادم'
+    : err.message || 'Internal server error';
+
+  return errorResponse(res, message, statusCode);
 });
 
 app.use(errorHandler);
