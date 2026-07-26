@@ -1,9 +1,11 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
+import OfflineBanner from './components/Common/OfflineBanner';
 import { ShieldAlert, Loader2 } from 'lucide-react';
 
 // Lazy-loaded Page Routes for Code Splitting & Performance
+const Landing = lazy(() => import('./pages/Landing'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const POS = lazy(() => import('./pages/POS'));
 const Products = lazy(() => import('./pages/Products'));
@@ -83,8 +85,19 @@ function App() {
     setUser(null);
   };
 
-  // If not logged in, render login page
+  // Allow viewing Public Landing page
+  const pathname = window.location.pathname;
+
+  // If not logged in, render login page or public landing
   if (!user) {
+    if (pathname === '/landing') {
+      return (
+        <Suspense fallback={<PageLoader />}>
+          <Landing />
+        </Suspense>
+      );
+    }
+
     return (
       <Suspense fallback={<PageLoader />}>
         <Login onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} />
@@ -93,9 +106,10 @@ function App() {
   }
 
   // If logged in as Super Admin, route all to Admin Panel directly
-  if (user.role === 'admin') {
+  if (user.role === 'admin' || user.role === 'SUPER_ADMIN') {
     return (
       <Router>
+        <OfflineBanner />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/admin" element={<AdminPanel user={user} onLogout={handleLogout} />} />
@@ -115,10 +129,12 @@ function App() {
 
   return (
     <Router>
+      <OfflineBanner />
       <Layout onLogout={handleLogout}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={getHomeElement()} />
+            <Route path="/landing" element={<Landing />} />
             <Route path="/price-checker" element={
               <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier', 'staff']}>
                 <PriceChecker />
