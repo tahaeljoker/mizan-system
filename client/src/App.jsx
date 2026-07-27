@@ -6,6 +6,7 @@ import { ShieldAlert, Loader2 } from 'lucide-react';
 
 // Lazy-loaded Page Routes for Code Splitting & Performance
 const Landing = lazy(() => import('./pages/Landing'));
+const Advisor = lazy(() => import('./pages/Advisor'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const POS = lazy(() => import('./pages/POS'));
 const Products = lazy(() => import('./pages/Products'));
@@ -85,7 +86,7 @@ function App() {
     setUser(null);
   };
 
-  // If not logged in, render login page or public landing
+  // If not logged in, render login page or public landing / advisor
   if (!user) {
     return (
       <Router>
@@ -93,6 +94,7 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/landing" element={<Landing />} />
+            <Route path="/advisor" element={<Advisor />} />
             <Route path="*" element={<Login onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} />} />
           </Routes>
         </Suspense>
@@ -100,7 +102,7 @@ function App() {
     );
   }
 
-  // If logged in as Super Admin, route all to Admin Panel directly (or landing)
+  // If logged in as Super Admin, route all to Admin Panel directly (or landing / advisor)
   if (user.role === 'admin' || user.role === 'SUPER_ADMIN') {
     return (
       <Router>
@@ -108,6 +110,7 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/landing" element={<Landing />} />
+            <Route path="/advisor" element={<Advisor />} />
             <Route path="/admin" element={<AdminPanel user={user} onLogout={handleLogout} />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
@@ -128,8 +131,9 @@ function App() {
       <OfflineBanner />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* Public Standalone Landing Page (No Sidebar / No ERP Layout) */}
+          {/* Public Standalone Landing & Advisor Pages (No Sidebar / No ERP Layout) */}
           <Route path="/landing" element={<Landing />} />
+          <Route path="/advisor" element={<Advisor />} />
 
           {/* All ERP Internal Routes Wrapped inside Layout */}
           <Route path="*" element={

@@ -31,12 +31,12 @@ import {
   XCircle,
   Monitor,
   Smartphone,
-  Globe
+  Globe,
+  Bot
 } from 'lucide-react';
 
 const Landing = () => {
   const [openFaq, setOpenFaq] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [contactSuccess, setContactSuccess] = useState(false);
 
@@ -135,8 +135,9 @@ const Landing = () => {
         </nav>
 
         <div className="flex align-center gap-12">
-          <Link to="/login" className="btn btn-secondary" style={{ padding: '9px 18px', fontSize: '13.5px' }}>
-            تسجيل الدخول
+          <Link to="/advisor" className="btn btn-secondary" style={{ padding: '9px 18px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <Bot size={16} className="text-primary" />
+            <span>تحدث مع مستشار مدار الذكي</span>
           </Link>
           <Link to="/login" className="btn btn-primary" style={{ padding: '9px 22px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
             <Sparkles size={16} />
@@ -188,9 +189,9 @@ const Landing = () => {
 
           <div className="flex justify-center align-center gap-16 mb-60">
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Link to="/login" className="btn btn-primary" style={{ padding: '16px 36px', fontSize: '17px', borderRadius: '12px', display: 'flex', gap: '10px', alignItems: 'center', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3)' }}>
-                <span>ابدأ التجربة المجانية</span>
-                <ArrowLeft size={20} />
+              <Link to="/advisor" className="btn btn-primary" style={{ padding: '16px 36px', fontSize: '17px', borderRadius: '12px', display: 'flex', gap: '10px', alignItems: 'center', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3)' }}>
+                <Bot size={20} />
+                <span>تحدث مع مستشار مدار</span>
               </Link>
             </motion.div>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -361,7 +362,7 @@ const Landing = () => {
                 <li className="flex align-center gap-8"><Check size={18} className="text-success" /> <span>شاشة كاشير POS كاملة</span></li>
                 <li className="flex align-center gap-8"><Check size={18} className="text-success" /> <span>دعم فني عادي عبر البريد</span></li>
               </ul>
-              <Link to="/login" className="btn btn-secondary" style={{ width: '100%', padding: '12px' }}>ابدأ الآن</Link>
+              <Link to="/advisor" className="btn btn-secondary" style={{ width: '100%', padding: '12px' }}>اختر الباقة</Link>
             </div>
 
             {/* Business */}
@@ -374,7 +375,7 @@ const Landing = () => {
                 <li className="flex align-center gap-8"><Check size={18} className="text-success" /> <span>موديول المالية والمصروفات</span></li>
                 <li className="flex align-center gap-8"><Check size={18} className="text-success" /> <span>دعم فني سريع عبر الواتساب</span></li>
               </ul>
-              <Link to="/login" className="btn btn-secondary" style={{ width: '100%', padding: '12px' }}>ابدأ الآن</Link>
+              <Link to="/advisor" className="btn btn-secondary" style={{ width: '100%', padding: '12px' }}>اختر الباقة</Link>
             </div>
 
             {/* Professional (Highlighted) */}
@@ -388,7 +389,7 @@ const Landing = () => {
                 <li className="flex align-center gap-8"><Check size={18} className="text-success" /> <span>جميع موديولات النظام مفعّلة</span></li>
                 <li className="flex align-center gap-8"><Check size={18} className="text-success" /> <span>دعم VIP مباشر 24/7</span></li>
               </ul>
-              <Link to="/login" className="btn btn-primary" style={{ width: '100%', padding: '12px' }}>ابدأ الان مجاناً</Link>
+              <Link to="/advisor" className="btn btn-primary" style={{ width: '100%', padding: '12px' }}>ابدأ الان مجاناً</Link>
             </motion.div>
 
             {/* Enterprise */}
@@ -593,9 +594,9 @@ const Landing = () => {
             انضم إلى مئات الشركات والأنشطة التجارية واجعل إدارة عملك أسهل وأسرع من اليوم!
           </p>
 
-          <Link to="/login" className="btn" style={{ padding: '16px 40px', fontSize: '18px', borderRadius: '12px', background: '#ffffff', color: 'var(--primary)', fontWeight: 'bold', display: 'inline-flex', gap: '10px', alignItems: 'center', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)' }}>
-            <span>ابدأ التجربة المجانية الآن 14 يوماً</span>
-            <ArrowLeft size={20} />
+          <Link to="/advisor" className="btn" style={{ padding: '16px 40px', fontSize: '18px', borderRadius: '12px', background: '#ffffff', color: 'var(--primary)', fontWeight: 'bold', display: 'inline-flex', gap: '10px', alignItems: 'center', boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)' }}>
+            <Bot size={22} />
+            <span>تحدث مع مستشار مدار الآن</span>
           </Link>
         </div>
       </section>
