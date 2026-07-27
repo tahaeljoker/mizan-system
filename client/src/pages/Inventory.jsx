@@ -22,7 +22,8 @@ const Inventory = () => {
     queryFn: () => apiService.products.getAll()
   });
 
-  const productsList = productsData?.products || productsData || [];
+  const rawProds = productsData?.data || productsData?.products || productsData;
+  const safeProductsList = Array.isArray(rawProds) ? rawProds : Array.isArray(productsData) ? productsData : [];
 
   const adjustStockMutation = useMutation({
     mutationFn: ({ id, quantity, type, reason }) => apiService.products.adjustStock(id, quantity, type, reason),
@@ -37,8 +38,9 @@ const Inventory = () => {
     }
   });
 
-  const filteredProducts = productsList.filter(p => {
-    const matchesSearch = p.name.includes(searchQuery) || (p.barcode && p.barcode.includes(searchQuery));
+  const filteredProducts = safeProductsList.filter(p => {
+    if (!p) return false;
+    const matchesSearch = (p.name && p.name.includes(searchQuery)) || (p.barcode && p.barcode.includes(searchQuery));
     const stock = p.stock || 0;
     const minStock = p.minStock || 5;
 
@@ -76,9 +78,9 @@ const Inventory = () => {
     });
   };
 
-  const lowStockCount = productsList.filter(p => (p.stock || 0) <= (p.minStock || 5) && (p.stock || 0) > 0).length;
-  const outOfStockCount = productsList.filter(p => (p.stock || 0) <= 0).length;
-  const totalStockValue = productsList.reduce((sum, p) => sum + ((p.stock || 0) * (p.sellPrice || 0)), 0);
+  const lowStockCount = safeProductsList.filter(p => p && (p.stock || 0) <= (p.minStock || 5) && (p.stock || 0) > 0).length;
+  const outOfStockCount = safeProductsList.filter(p => p && (p.stock || 0) <= 0).length;
+  const totalStockValue = safeProductsList.reduce((sum, p) => sum + ((p?.stock || 0) * (p?.sellPrice || 0)), 0);
 
   return (
     <div>
@@ -97,33 +99,33 @@ const Inventory = () => {
             <span className="stat-value" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
               {totalStockValue.toLocaleString()} ج.م
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي عدد الأصناف: {productsList.length}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إجمالي عدد الأصناف: {safeProductsList.length}</span>
           </div>
           <div className="stat-icon primary">
             <Boxes size={24} />
           </div>
         </div>
 
-        <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilterType('low')}>
+        <div className="card stat-card" style={{ borderColor: 'rgba(245, 158, 11, 0.3)' }}>
           <div className="stat-info">
-            <span className="stat-title">أصناف قريبة من النفاد (Low Stock)</span>
-            <span className="stat-value" style={{ color: lowStockCount > 0 ? 'var(--warning)' : 'var(--text-main)' }}>
+            <span className="stat-title">أصناف قريبة من النفاد (نواقص)</span>
+            <span className="stat-value" style={{ color: '#f59e0b' }}>
               {lowStockCount} أصناف
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>اقتربت من الحد الأدنى</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>وصلت للحد الأدنى للمخزون</span>
           </div>
           <div className="stat-icon warning">
             <AlertTriangle size={24} />
           </div>
         </div>
 
-        <div className="card stat-card" style={{ cursor: 'pointer' }} onClick={() => setFilterType('out')}>
+        <div className="card stat-card" style={{ borderColor: 'rgba(239, 68, 68, 0.3)' }}>
           <div className="stat-info">
             <span className="stat-title">أصناف منتهية بالكامل (Out of Stock)</span>
-            <span className="stat-value" style={{ color: outOfStockCount > 0 ? 'var(--danger)' : 'var(--text-main)' }}>
+            <span className="stat-value" style={{ color: 'var(--danger)' }}>
               {outOfStockCount} أصناف
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>تتطلب إعادة طلب من المورد</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الرصيد زيرو قطعية</span>
           </div>
           <div className="stat-icon danger">
             <AlertTriangle size={24} />
@@ -131,121 +133,185 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* Filter Tabs */}
+      {/* Filter & Search Controls */}
       <div className="card mb-24" style={{ padding: '16px' }}>
-        <div className="flex justify-between align-center">
-          <div className="header-search" style={{ width: '60%' }}>
+        <div className="flex justify-between align-center" style={{ flexWrap: 'wrap', gap: '16px' }}>
+          <div className="header-search" style={{ width: '320px' }}>
             <Search size={18} />
-            <input 
-              type="text" 
-              placeholder="البحث باسم المنتج أو الباركود..." 
+            <input
+              type="text"
+              placeholder="البحث باسم المنتج أو البارشود..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
           <div className="flex gap-8">
-            <button className={`btn ${filterType === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilterType('all')}>
-              كل الأصناف ({productsList.length})
+            <button
+              className={`btn ${filterType === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setFilterType('all')}
+            >
+              جميع المنتجات ({safeProductsList.length})
             </button>
-            <button className={`btn ${filterType === 'low' ? 'btn-warning' : 'btn-secondary'}`} onClick={() => setFilterType('low')}>
-              مخزون منخفض ({lowStockCount})
+            <button
+              className={`btn ${filterType === 'low' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ background: filterType === 'low' ? '#f59e0b' : '', borderColor: filterType === 'low' ? '#f59e0b' : '' }}
+              onClick={() => setFilterType('low')}
+            >
+              النواقص ({lowStockCount})
             </button>
-            <button className={`btn ${filterType === 'out' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setFilterType('out')}>
-              منتهي ({outOfStockCount})
+            <button
+              className={`btn ${filterType === 'out' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ background: filterType === 'out' ? 'var(--danger)' : '', borderColor: filterType === 'out' ? 'var(--danger)' : '' }}
+              onClick={() => setFilterType('out')}
+            >
+              المنتهية ({outOfStockCount})
             </button>
           </div>
         </div>
       </div>
 
-      {/* Inventory Products Table */}
+      {/* Inventory Table */}
       <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>اسم المنتج</th>
-                <th>الباركود / SKU</th>
-                <th>المخزون الحالي</th>
-                <th>الحد الأدنى</th>
-                <th>سعر البيع</th>
-                <th>حالة المخزون</th>
-                <th style={{ textAlign: 'center' }}>تسوية الكمية</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan="7" style={{ textAlign: 'center' }}>جاري تحميل المخزون...</td></tr>
-              ) : filteredProducts.length > 0 ? (
-                filteredProducts.map((product) => {
-                  const stock = product.stock || 0;
-                  const minStock = product.minStock || 5;
-                  const isOut = stock <= 0;
-                  const isLow = stock <= minStock && !isOut;
+        <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>جدول حصر وأرصدة المخزون</h3>
 
-                  return (
-                    <tr key={product._id || product.id}>
-                      <td style={{ fontWeight: '600' }}>{product.name}</td>
-                      <td>{product.barcode || product.sku || 'N/A'}</td>
-                      <td style={{ fontWeight: 'bold', fontSize: '15px' }}>{stock} {product.unit || 'قطعة'}</td>
-                      <td>{minStock} {product.unit || 'قطعة'}</td>
-                      <td style={{ fontWeight: 'bold' }}>{(product.sellPrice || 0).toLocaleString()} ج.م</td>
-                      <td>
-                        <span className={`badge badge-${isOut ? 'danger' : isLow ? 'warning' : 'success'}`}>
-                          {isOut ? 'منتهي' : isLow ? 'منخفض' : 'متوفر'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button className="btn btn-secondary btn-sm" onClick={() => openAdjustModal(product)}>
-                          تسوية / تعديل
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد منتجات مطابقة في المخزن</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            جاري تحميل أرصدة المخزون...
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>الباركود</th>
+                  <th>اسم الصنف</th>
+                  <th>الفئة</th>
+                  <th>الرصيد المتاح</th>
+                  <th>حد الأمان</th>
+                  <th>قيمة المخزون الإجمالية</th>
+                  <th>الحالة</th>
+                  <th>التسوية والجرد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.length > 0 ? (
+                  filteredProducts.map((p) => {
+                    const stock = p.stock || 0;
+                    const minStock = p.minStock || 5;
+                    const isOut = stock <= 0;
+                    const isLow = stock <= minStock && !isOut;
+
+                    return (
+                      <tr key={p._id || p.id}>
+                        <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{p.barcode || 'N/A'}</td>
+                        <td style={{ fontWeight: 'bold' }}>{p.name}</td>
+                        <td><span className="badge info">{p.category || 'عام'}</span></td>
+                        <td style={{ fontWeight: 'bold', fontSize: '15px' }}>{stock} {p.unit || 'قطعة'}</td>
+                        <td>{minStock} قطعة</td>
+                        <td>{((p.sellPrice || 0) * stock).toLocaleString()} ج.م</td>
+                        <td>
+                          {isOut ? (
+                            <span className="badge danger">منتهي بالكامل 🛑</span>
+                          ) : isLow ? (
+                            <span className="badge warning">نواقص (قريب من النفاد) ⚠️</span>
+                          ) : (
+                            <span className="badge success">رصيد آمن وممتلئ</span>
+                          )}
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '12px' }}
+                            onClick={() => openAdjustModal(p)}
+                          >
+                            تعديل / تسوية الرصيد
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                      لا توجد أصناف مطابقة للتصفية الحالية.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Adjust Modal */}
+      {/* Adjust Stock Modal */}
       {showAdjustModal && selectedProduct && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>تسوية مخزون ({selectedProduct.name})</h3>
-              <button className="close-btn" onClick={() => setShowAdjustModal(false)}><X size={20} /></button>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-ar)'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 'var(--radius-lg)',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '24px',
+            direction: 'rtl'
+          }}>
+            <div className="flex justify-between align-center mb-16">
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>تسوية ورصد مخزون صنف</h3>
+              <X size={20} style={{ cursor: 'pointer' }} onClick={() => setShowAdjustModal(false)} />
             </div>
-            <form onSubmit={handleAdjustSubmit}>
-              <div className="p-12 mb-16" style={{ background: 'var(--bg-app)', borderRadius: '8px' }}>
-                <p><strong>المخزون الحالي:</strong> {selectedProduct.stock || 0} {selectedProduct.unit || 'قطعة'}</p>
+
+            <div style={{ background: 'var(--bg-app)', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px' }}>
+              <div style={{ fontWeight: 'bold', fontSize: '15px' }}>{selectedProduct.name}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                الرصيد الحالي بالمخزن: <strong style={{ color: 'var(--primary)' }}>{selectedProduct.stock || 0} قطعة</strong>
               </div>
+            </div>
+
+            <form onSubmit={handleAdjustSubmit}>
               <div className="form-group mb-16">
-                <label className="form-label">مقدار التعديل (موجب للزيادة / سالب للخصم) *</label>
-                <input 
-                  type="number" 
-                  className="form-control"
+                <label>كمية التعديل والتسوية *</label>
+                <input
+                  type="number"
                   value={adjustQty}
-                  onChange={(e) => setAdjustQty(parseInt(e.target.value) || 0)}
-                  placeholder="مثال: 5 أو -2"
+                  onChange={(e) => setAdjustQty(Number(e.target.value))}
+                  placeholder="أدخل كمية موجبة للزيادة أو سالبة للخصم"
                   required
                 />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  مثال: ادخل 5 لإضافة 5 قطع، أو -3 لخصم 3 قطع من المخزون التالف أو المفقود.
+                </span>
               </div>
-              <div className="form-group mb-16">
-                <label className="form-label">سبب التعديل</label>
-                <input 
-                  type="text" 
-                  className="form-control"
+
+              <div className="form-group mb-24">
+                <label>سبب التسوية أو الجرد</label>
+                <select
                   value={adjustReason}
                   onChange={(e) => setAdjustReason(e.target.value)}
-                  placeholder="جرد دوري / هالك / عينة"
-                />
+                >
+                  <option value="جرد دوري">جرد دوري مستمر</option>
+                  <option value="بضاعة تالفة">تسوية بضاعة تالفة / هالكة</option>
+                  <option value="استلام توريد جديد">استلام توريد كمية جديدة</option>
+                  <option value="خطأ بالفاتورة">تسوية خطأ بالبيانات</option>
+                </select>
               </div>
-              <div className="flex gap-12 justify-end">
+
+              <div className="flex justify-end gap-12">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAdjustModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">حفظ التسوية</button>
+                <button type="submit" className="btn btn-primary" disabled={adjustStockMutation.isPending}>
+                  {adjustStockMutation.isPending ? 'جاري التسوية...' : 'حفظ تعديل المخزون'}
+                </button>
               </div>
             </form>
           </div>
