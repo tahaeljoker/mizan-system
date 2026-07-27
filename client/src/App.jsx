@@ -85,33 +85,29 @@ function App() {
     setUser(null);
   };
 
-  // Allow viewing Public Landing page
-  const pathname = window.location.pathname;
-
   // If not logged in, render login page or public landing
   if (!user) {
-    if (pathname === '/landing') {
-      return (
-        <Suspense fallback={<PageLoader />}>
-          <Landing />
-        </Suspense>
-      );
-    }
-
     return (
-      <Suspense fallback={<PageLoader />}>
-        <Login onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} />
-      </Suspense>
+      <Router>
+        <OfflineBanner />
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/landing" element={<Landing />} />
+            <Route path="*" element={<Login onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} />} />
+          </Routes>
+        </Suspense>
+      </Router>
     );
   }
 
-  // If logged in as Super Admin, route all to Admin Panel directly
+  // If logged in as Super Admin, route all to Admin Panel directly (or landing)
   if (user.role === 'admin' || user.role === 'SUPER_ADMIN') {
     return (
       <Router>
         <OfflineBanner />
         <Suspense fallback={<PageLoader />}>
           <Routes>
+            <Route path="/landing" element={<Landing />} />
             <Route path="/admin" element={<AdminPanel user={user} onLogout={handleLogout} />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
@@ -130,91 +126,98 @@ function App() {
   return (
     <Router>
       <OfflineBanner />
-      <Layout onLogout={handleLogout}>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={getHomeElement()} />
-            <Route path="/landing" element={<Landing />} />
-            <Route path="/price-checker" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier', 'staff']}>
-                <PriceChecker />
-              </AuthWrapper>
-            } />
-            <Route path="/pos" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
-                <POS />
-              </AuthWrapper>
-            } />
-            <Route path="/products" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <Products />
-              </AuthWrapper>
-            } />
-            <Route path="/inventory" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'staff']}>
-                <Inventory />
-              </AuthWrapper>
-            } />
-            <Route path="/suppliers" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <Suppliers />
-              </AuthWrapper>
-            } />
-            <Route path="/customers" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <Customers />
-              </AuthWrapper>
-            } />
-            <Route path="/reports" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <Reports />
-              </AuthWrapper>
-            } />
-            <Route path="/users" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner']}>
-                <Users />
-              </AuthWrapper>
-            } />
-            <Route path="/branches" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <Branches />
-              </AuthWrapper>
-            } />
-            <Route path="/cashier-shift" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
-                <CashierShift />
-              </AuthWrapper>
-            } />
-            <Route path="/returns" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
-                <Returns />
-              </AuthWrapper>
-            } />
-            <Route path="/billing" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner']}>
-                <Billing />
-              </AuthWrapper>
-            } />
-            <Route path="/settings" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <Settings />
-              </AuthWrapper>
-            } />
-            <Route path="/expenses" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <Expenses />
-              </AuthWrapper>
-            } />
-            <Route path="/transfer-logs" element={
-              <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
-                <TransferLogs />
-              </AuthWrapper>
-            } />
-            {/* Catch-all redirects */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </Layout>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          {/* Public Standalone Landing Page (No Sidebar / No ERP Layout) */}
+          <Route path="/landing" element={<Landing />} />
+
+          {/* All ERP Internal Routes Wrapped inside Layout */}
+          <Route path="*" element={
+            <Layout onLogout={handleLogout}>
+              <Routes>
+                <Route path="/" element={getHomeElement()} />
+                <Route path="/price-checker" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier', 'staff']}>
+                    <PriceChecker />
+                  </AuthWrapper>
+                } />
+                <Route path="/pos" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
+                    <POS />
+                  </AuthWrapper>
+                } />
+                <Route path="/products" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <Products />
+                  </AuthWrapper>
+                } />
+                <Route path="/inventory" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'staff']}>
+                    <Inventory />
+                  </AuthWrapper>
+                } />
+                <Route path="/suppliers" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <Suppliers />
+                  </AuthWrapper>
+                } />
+                <Route path="/customers" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <Customers />
+                  </AuthWrapper>
+                } />
+                <Route path="/reports" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <Reports />
+                  </AuthWrapper>
+                } />
+                <Route path="/users" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner']}>
+                    <Users />
+                  </AuthWrapper>
+                } />
+                <Route path="/branches" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <Branches />
+                  </AuthWrapper>
+                } />
+                <Route path="/cashier-shift" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
+                    <CashierShift />
+                  </AuthWrapper>
+                } />
+                <Route path="/returns" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
+                    <Returns />
+                  </AuthWrapper>
+                } />
+                <Route path="/billing" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner']}>
+                    <Billing />
+                  </AuthWrapper>
+                } />
+                <Route path="/settings" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <Settings />
+                  </AuthWrapper>
+                } />
+                <Route path="/expenses" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <Expenses />
+                  </AuthWrapper>
+                } />
+                <Route path="/transfer-logs" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <TransferLogs />
+                  </AuthWrapper>
+                } />
+                {/* Catch-all redirects */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Layout>
+          } />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }
