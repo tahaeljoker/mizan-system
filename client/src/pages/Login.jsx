@@ -133,6 +133,7 @@ const Login = ({ onLoginSuccess }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="owner@demo.madar.app"
+                  autoComplete="username"
                   style={{ paddingRight: '40px', direction: 'ltr' }}
                   required
                 />
@@ -148,6 +149,7 @@ const Login = ({ onLoginSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
+                  autoComplete="current-password"
                   style={{ paddingRight: '40px', direction: 'ltr' }}
                   required
                 />
