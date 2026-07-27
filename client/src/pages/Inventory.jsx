@@ -31,7 +31,7 @@ const Inventory = () => {
       queryClient.invalidateQueries({ queryKey: ['inventoryProducts'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardOverview'] });
       setShowAdjustModal(false);
-      alert('تم تعديل كمية المخزون وتحديث السجلات بنجاح! ✅');
+      alert('تم تعديل كمية المخزون وتحديث السجلات بنجاح.');
     },
     onError: (err) => {
       alert('حدث خطأ أثناء تعديل المخزون: ' + err.message);
@@ -86,7 +86,7 @@ const Inventory = () => {
     <div>
       <div className="flex justify-between align-center mb-24">
         <div>
-          <h1 style={{ fontSize: '28px' }}>إدارة ورصد المخزون 📦</h1>
+          <h1 style={{ fontSize: '28px' }}>إدارة ورصد المخزون</h1>
           <p style={{ color: 'var(--text-muted)' }}>متابعة كميات المنتجات بالمخازن، التنبيهات، التسويات والجرد الدوري.</p>
         </div>
       </div>
@@ -212,9 +212,9 @@ const Inventory = () => {
                         <td>{((p.sellPrice || 0) * stock).toLocaleString()} ج.م</td>
                         <td>
                           {isOut ? (
-                            <span className="badge danger">منتهي بالكامل 🛑</span>
+                            <span className="badge danger">منتهي بالكامل</span>
                           ) : isLow ? (
-                            <span className="badge warning">نواقص (قريب من النفاد) ⚠️</span>
+                            <span className="badge warning">نواقص (قريب من النفاد)</span>
                           ) : (
                             <span className="badge success">رصيد آمن وممتلئ</span>
                           )}

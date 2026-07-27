@@ -34,7 +34,9 @@ import {
   Headphones,
   RefreshCw,
   Lock,
-  Smartphone
+  Smartphone,
+  CheckCircle,
+  Building
 } from 'lucide-react';
 import PricingCalculator from '../components/PricingCalculator';
 
@@ -121,9 +123,9 @@ const Landing = () => {
 
   // Testimonials
   const testimonials = [
-    { name: 'المهندس طارق العبد', company: 'سلسلة محلات النور للملابس', text: 'منصة مدار حولت إدارة فروعنا بالكامل إلى نظام سلس ومترابط. صرنا نتابع المبيعات والأرباح لحظة بلحظة من الموبايل!', rating: 5, avatar: '👨‍💼' },
-    { name: 'أحمد أبو علي', company: 'سوبرماركت المدينة المنورة', text: 'سرعة الكاشير وطباعة الفواتير غيرت تجربة العملاء تماماً. الدعم الفني ممتاز وسريع جداً في الرد.', rating: 5, avatar: '🛒' },
-    { name: 'الحاج محمود عبده', company: 'معرض النور للسجاد والمنسوجات', text: 'سهولة إدارة حسابات الموردين والعملاء والقيود المالية وفرت علينا مجهود كبير جداً. ننصح بها بشدة!', rating: 5, avatar: '🏬' }
+    { name: 'المهندس طارق العبد', company: 'سلسلة محلات النور للملابس', text: 'منصة مدار حولت إدارة فروعنا بالكامل إلى نظام سلس ومترابط. صرنا نتابع المبيعات والأرباح لحظة بلحظة من الموبايل!', rating: 5 },
+    { name: 'أحمد أبو علي', company: 'سوبرماركت المدينة المنورة', text: 'سرعة الكاشير وطباعة الفواتير غيرت تجربة العملاء تماماً. الدعم الفني ممتاز وسريع جداً في الرد.', rating: 5 },
+    { name: 'الحاج محمود عبده', company: 'معرض النور للسجاد والمنسوجات', text: 'سهولة إدارة حسابات الموردين والعملاء والقيود المالية وفرت علينا مجهود كبير جداً. ننصح بها بشدة!', rating: 5 }
   ];
 
   const faqs = [
@@ -201,22 +203,22 @@ const Landing = () => {
           transition={{ duration: 0.7 }}
           style={{ maxWidth: '900px', margin: '0 auto' }}
         >
-          {/* Flame Social Proof Badge */}
+          {/* Social Proof Badge */}
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
             padding: '8px 22px',
-            background: 'rgba(239, 68, 68, 0.08)',
-            color: '#dc2626',
+            background: 'rgba(79, 70, 229, 0.08)',
+            color: 'var(--primary)',
             borderRadius: '24px',
             fontSize: '13.5px',
             fontWeight: 'bold',
             marginBottom: '28px',
-            border: '1px solid rgba(239, 68, 68, 0.2)'
+            border: '1px solid rgba(79, 70, 229, 0.2)'
           }}>
-            <Flame size={18} style={{ color: '#ef4444' }} />
-            <span>🔥 أكثر من 500 شركة ونشاط تجاري يثقون في منصة مدار Cloud</span>
+            <Flame size={18} style={{ color: 'var(--primary)' }} />
+            <span>أكثر من 500 شركة ونشاط تجاري يثقون في منصة مدار Cloud</span>
           </div>
 
           <h1 style={{ fontSize: '48px', fontWeight: '900', lineHeight: '1.25', color: '#0f172a', marginBottom: '24px' }}>
@@ -245,7 +247,7 @@ const Landing = () => {
           </div>
 
           <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '50px' }}>
-            🔒 بدون بطاقة ائتمان • إعداد فوري في دقيقة • دعم عربي كامل
+            بدون بطاقة ائتمان • إعداد فوري في دقيقة • دعم عربي كامل
           </div>
 
           {/* Interactive Laptop + Mobile Dashboard Mockup */}
@@ -272,7 +274,7 @@ const Landing = () => {
                 <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }}></span>
                 <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px', fontWeight: 'bold' }}>madar.app/dashboard</span>
               </div>
-              <span className="badge success">مباشر ومحدث الآن 🟢</span>
+              <span className="badge success">مباشر ومحدث الآن</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
@@ -329,7 +331,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* PART 11 — Customer Logos Gallery */}
+      {/* Customer Logos Gallery */}
       <section style={{ padding: '40px 20px', background: 'var(--bg-app)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 'bold', display: 'block', marginBottom: '20px' }}>
@@ -341,7 +343,7 @@ const Landing = () => {
                 key={idx}
                 whileHover={{ scale: 1.1, filter: 'grayscale(0%)' }}
                 style={{
-                  fontSize: '16px',
+                  fontSize: '15px',
                   fontWeight: '800',
                   color: 'var(--text-muted)',
                   filter: 'grayscale(100%)',
@@ -350,17 +352,21 @@ const Landing = () => {
                   padding: '8px 16px',
                   borderRadius: '8px',
                   background: '#ffffff',
-                  border: '1px solid var(--border)'
+                  border: '1px solid var(--border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                🏢 {logo}
+                <Building size={16} />
+                <span>{logo}</span>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* PART 7 — Why Madar? (لماذا مدار؟) */}
+      {/* Why Madar? (لماذا مدار؟) */}
       <section id="why-madar" style={{ padding: '80px 20px', maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '56px' }}>
           <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '14px' }}>لماذا يختار التجار والشركات منصة مدار Cloud؟</h2>
@@ -419,7 +425,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* PART 1 & 2 — Redesigned Smart SaaS Pricing UI */}
+      {/* Redesigned Smart SaaS Pricing UI */}
       <section id="pricing" style={{ padding: '80px 20px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '36px' }}>
@@ -441,7 +447,7 @@ const Landing = () => {
                 onClick={() => setIsYearly(true)}
               >
                 <span>دفع سنوي</span>
-                <span style={{ background: '#10b981', color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>خصم شهرين مجاناً 🎁</span>
+                <span style={{ background: '#10b981', color: '#fff', fontSize: '11px', padding: '2px 8px', borderRadius: '12px', fontWeight: 'bold' }}>خصم شهرين مجاناً</span>
               </button>
             </div>
           </div>
@@ -470,7 +476,7 @@ const Landing = () => {
 
             {/* Business (Most Popular) */}
             <motion.div whileHover={{ y: -6 }} className="card" style={{ padding: '32px', border: '2px solid var(--primary)', background: '#ffffff', borderRadius: '20px', position: 'relative', boxShadow: '0 15px 35px rgba(79, 70, 229, 0.15)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <span style={{ position: 'absolute', top: '-14px', right: '50%', transform: 'translateX(50%)', background: 'var(--primary)', color: '#fff', fontSize: '12px', padding: '4px 18px', borderRadius: '14px', fontWeight: 'bold' }}>الأكثر مبيعاً ⭐ Most Popular</span>
+              <span style={{ position: 'absolute', top: '-14px', right: '50%', transform: 'translateX(50%)', background: 'var(--primary)', color: '#fff', fontSize: '12px', padding: '4px 18px', borderRadius: '14px', fontWeight: 'bold' }}>الأكثر مبيعاً Most Popular</span>
               <div>
                 <h3 style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: '8px' }}>الأعمال (Business)</h3>
                 <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>للمحلات التجارية المتوسطة المتوسعة</p>
@@ -525,12 +531,12 @@ const Landing = () => {
             </div>
           </div>
 
-          {/* PART 3 & 4 — Smart Pricing Calculator Component */}
+          {/* Smart Pricing Calculator Component */}
           <div id="calculator">
             <PricingCalculator />
           </div>
 
-          {/* PART 9 — Detailed Feature Comparison Table */}
+          {/* Detailed Feature Comparison Table */}
           <div style={{ marginTop: '60px' }}>
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <h3 style={{ fontSize: '26px', fontWeight: 'bold', marginBottom: '8px' }}>جدول المقارنة التفصيلي بين الباقات</h3>
@@ -543,7 +549,7 @@ const Landing = () => {
                   <tr>
                     <th>الوحدة / الميزة</th>
                     <th style={{ textAlign: 'center' }}>المبتدئة (Starter)</th>
-                    <th style={{ textAlign: 'center', color: 'var(--primary)' }}>الأعمال (Business) ⭐</th>
+                    <th style={{ textAlign: 'center', color: 'var(--primary)' }}>الأعمال (Business)</th>
                     <th style={{ textAlign: 'center' }}>الاحترافية (Pro)</th>
                     <th style={{ textAlign: 'center' }}>المؤسسات (Enterprise)</th>
                   </tr>
@@ -598,7 +604,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* PART 12 — Testimonials Carousel / Grid */}
+      {/* Testimonials Carousel / Grid */}
       <section style={{ padding: '80px 20px', maxWidth: '1100px', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '56px' }}>
           <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '14px' }}>آراء عملائنا وشركاء النجاح</h2>
@@ -609,7 +615,6 @@ const Landing = () => {
           {testimonials.map((t, idx) => (
             <motion.div key={idx} whileHover={{ y: -6 }} className="card" style={{ padding: '28px', border: '1px solid var(--border)', background: '#ffffff', borderRadius: '16px' }}>
               <div className="flex justify-between align-center mb-16">
-                <div style={{ fontSize: '28px' }}>{t.avatar}</div>
                 <div className="flex gap-4">
                   {[...Array(t.rating)].map((_, i) => (
                     <Star key={i} size={18} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
@@ -628,7 +633,7 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* PART 8 — FAQ Accordion Below Pricing */}
+      {/* FAQ Accordion Below Pricing */}
       <section id="faq" style={{ padding: '80px 20px', background: '#ffffff', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
         <div style={{ maxWidth: '850px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '48px' }}>
@@ -694,7 +699,7 @@ const Landing = () => {
           <div style={{ background: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid var(--border)' }}>
             {contactSuccess && (
               <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', borderRadius: '8px', marginBottom: '20px', fontSize: '13.5px' }}>
-                تم إرسال رسالتك بنجاح! سيتواصل معك أحد ممثلي المبيعات في أقرب وقت. 🎉
+                تم إرسال رسالتك بنجاح! سيتواصل معك أحد ممثلي المبيعات في أقرب وقت.
               </div>
             )}
 

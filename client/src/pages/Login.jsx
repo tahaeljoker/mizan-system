@@ -3,13 +3,13 @@ import { ShoppingBag, Eye, EyeOff, Lock, Mail, Sparkles, UserCheck } from 'lucid
 import apiService from '../services/api';
 
 const DEMO_BUTTONS = [
-  { role: 'owner', label: '👑 المالك (Owner)', email: 'owner@demo.madar.app', desc: 'تحكم كامل بجميع الموديولات' },
-  { role: 'admin', label: '🛡️ المدير (Admin)', email: 'admin@demo.madar.app', desc: 'الإدارة العامة والتقارير' },
-  { role: 'manager', label: '🏢 مدير الفرع (Manager)', desc: 'مخزون ومبيعات الفرع', email: 'manager@demo.madar.app' },
-  { role: 'accountant', label: '📊 المحاسب (Accountant)', email: 'accountant@demo.madar.app', desc: 'المالية والقيود والبنك' },
-  { role: 'cashier', label: '💰 الكاشير (Cashier)', email: 'cashier@demo.madar.app', desc: 'POS والدرج وإغلاق الشيفت' },
-  { role: 'warehouse', label: '📦 أمين المخزن (Warehouse)', email: 'warehouse@demo.madar.app', desc: 'التحويلات والجرد' },
-  { role: 'staff', label: '🔍 موظف الجرد (Staff)', email: 'staff@demo.madar.app', desc: 'فحص الأسعار والجرد' }
+  { role: 'owner', label: 'المالك (Owner)', email: 'owner@demo.madar.app', desc: 'تحكم كامل بجميع الموديولات' },
+  { role: 'admin', label: 'المدير (Admin)', email: 'admin@demo.madar.app', desc: 'الإدارة العامة والتقارير' },
+  { role: 'manager', label: 'مدير الفرع (Manager)', desc: 'مخزون ومبيعات الفرع', email: 'manager@demo.madar.app' },
+  { role: 'accountant', label: 'المحاسب (Accountant)', email: 'accountant@demo.madar.app', desc: 'المالية والقيود والبنك' },
+  { role: 'cashier', label: 'الكاشير (Cashier)', email: 'cashier@demo.madar.app', desc: 'POS والدرج وإغلاق الشيفت' },
+  { role: 'warehouse', label: 'أمين المخزن (Warehouse)', email: 'warehouse@demo.madar.app', desc: 'التحويلات والجرد' },
+  { role: 'staff', label: 'موظف الجرد (Staff)', email: 'staff@demo.madar.app', desc: 'فحص الأسعار والجرد' }
 ];
 
 const Login = ({ onLoginSuccess }) => {

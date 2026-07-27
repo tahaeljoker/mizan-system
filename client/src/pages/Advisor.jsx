@@ -20,7 +20,7 @@ import apiService from '../services/api';
 const QUESTIONS = [
   {
     id: 'businessType',
-    question: 'مرحباً بك! أنا مستشار مدار الذكي 🤖👋. يسعدني مساعدتك في اختيار الباقة والحل السحابي الأنسب لنشاطك التجارى. بدايةً، ما هو نوع نشاطك؟',
+    question: 'مرحباً بك! أنا مستشار مدار الذكي. يسعدني مساعدتك في اختيار الباقة والحل السحابي الأنسب لنشاطك التجارى. بدايةً، ما هو نوع نشاطك؟',
     options: ['مطعم / كافيه', 'سوبرماركت / بقالة', 'محل ملابس وأحذية', 'إلكترونيات وأجهزة', 'مخزن / تجارة جملة', 'مصنع / ورشة', 'شركة / خدمات', 'صيدلية', 'عيادة', 'نشاط آخر']
   },
   {
@@ -102,7 +102,7 @@ const Advisor = () => {
 
     // Push User Answer Message
     const updatedMessages = [
-      ...messages.map(m => ({ ...m, options: null })), // disable previous options
+      ...messages.map(m => ({ ...m, options: null })),
       { sender: 'user', text: option }
     ];
     setMessages(updatedMessages);
@@ -129,7 +129,7 @@ const Advisor = () => {
     }
   };
 
-  // Rule-Based Subscription Recommendation Engine (No AI API)
+  // Rule-Based Subscription Recommendation Engine
   const calculateRecommendation = (finalAnswers) => {
     const branches = finalAnswers.branches;
     const employees = finalAnswers.employees;
@@ -140,18 +140,18 @@ const Advisor = () => {
     let plan = {
       code: 'BUSINESS',
       name: 'باقة الأعمال (Business)',
-      monthlyPrice: 199,
-      yearlyPrice: 1990,
-      reason: 'الباقة الأكثر توازناً لنشاطك التجارى، توفر إدارة كاملة للمبيعات والمخزون حتى 5 مستخدمين و 3 فروع.',
-      features: ['شاشة كاشير POS كاملة', 'حتى 5 مستخدمين + 3 فروع', 'إدارة المخزون والتنبيهات بالنواقص', 'موديول المصروفات والمالية', 'دعم فني عبر الواتساب']
+      monthlyPrice: 999,
+      yearlyPrice: 9990,
+      reason: 'الباقة الأكثر توازناً لنشاطك التجارى، توفر إدارة كاملة للمبيعات والمخزون حتى 20 مستخدمين و 5 فروع.',
+      features: ['شاشة كاشير POS كاملة', 'حتى 20 مستخدم + 5 فروع', 'إدارة المخزون والتنبيهات بالنواقص', 'موديول المصروفات والمالية', 'دعم فني عبر الواتساب']
     };
 
     if (branches?.includes('أكثر من 10') || employees?.includes('أكثر من 15')) {
       plan = {
         code: 'ENTERPRISE',
         name: 'باقة المؤسسات (Enterprise)',
-        monthlyPrice: 999,
-        yearlyPrice: 9990,
+        monthlyPrice: 2999,
+        yearlyPrice: 29990,
         reason: 'مصممة للشركات الكبرى والمؤسسات ذات الفروع المتعددة، توفر سيرفر مستقل ودعم فني مخصص.',
         features: ['فروع ومستخدمين غير محدودين', 'خادم سحابي خاص ومستقل', 'ربط وتخصيص الدومين الخاص', 'شجرة حسابات وقيود مزدوجة كاملة', 'مدير حساب مخصص وتدريب ميداني']
       };
@@ -159,26 +159,26 @@ const Advisor = () => {
       plan = {
         code: 'PRO',
         name: 'الباقة الاحترافية (Professional)',
-        monthlyPrice: 349,
-        yearlyPrice: 3490,
+        monthlyPrice: 1999,
+        yearlyPrice: 19990,
         reason: 'تمنحك تحكماً احترافياً كاملاً في الحسابات المالية والقيود المزدوجة والفروع المتعددة.',
-        features: ['حتى 15 مستخدم + 10 فروع', 'أصناف غير محدودة بالمخزن', 'شجرة حسابات وقيود محاسبية مزدوجة', 'موديول الموردين والمشتريات', 'دعم VIP مباشر 24/7']
+        features: ['فروع ومستخدمين غير محدودين', 'أصناف غير محدودة بالمخزن', 'شجرة حسابات وقيود محاسبية مزدوجة', 'موديول الموردين والمشتريات', 'دعم VIP مباشر 24/7']
       };
     } else if (branches?.includes('فرع واحد') && employees?.includes('1 إلى 2') && !needAcc) {
       plan = {
         code: 'STARTER',
         name: 'الباقة المبتدئة (Starter)',
-        monthlyPrice: 99,
-        yearlyPrice: 990,
+        monthlyPrice: 499,
+        yearlyPrice: 4990,
         reason: 'مثالية للمحلات الصغيرة والمشاريع الناشئة التي تحتاج كاشير سريع ومخزون بسيط.',
-        features: ['مستخدم واحد + فرع واحد', 'حتى 500 صنف بضاعة', 'شاشة كاشير POS سريعة', 'طباعة فواتير حرارية 80mm', 'دعم فني عادي']
+        features: ['حتى 3 مستخدمين + فرع واحد', 'حتى 500 صنف بضاعة', 'شاشة كاشير POS سريعة', 'طباعة فواتير حرارية 80mm', 'دعم فني عادي']
       };
     }
 
     setRecommendation(plan);
     setMessages(prev => [
       ...prev,
-      { sender: 'bot', text: `بناءً على إجاباتك ودراسة نشاطك التجارى، يسعدني تقديم التوصية التالية للباقة الأنسب لك! 🎉` }
+      { sender: 'bot', text: `بناءً على إجاباتك ودراسة نشاطك التجارى، يسعدني تقديم التوصية التالية للباقة الأنسب لك.` }
     ]);
   };
 
@@ -203,7 +203,7 @@ const Advisor = () => {
       });
 
       if (response.success) {
-        alert('تم إنشاء حساب شركتك وتفعيل التجربة المجانية بنجاح! 🚀');
+        alert('تم إنشاء حساب شركتك وتفعيل التجربة المجانية بنجاح.');
         navigate('/login');
       } else {
         setRegError(response.message || 'فشل في تسجيل الشركة');
@@ -365,7 +365,7 @@ const Advisor = () => {
           }}>
             <div className="flex justify-between align-center mb-16" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
               <div>
-                <span className="badge primary mb-8" style={{ fontSize: '12px' }}>التوصية المخصصة لنشاطك 🎯</span>
+                <span className="badge primary mb-8" style={{ fontSize: '12px' }}>التوصية المخصصة لنشاطك</span>
                 <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>{recommendation.name}</h2>
               </div>
               <div style={{ textAlign: 'left' }}>
@@ -375,7 +375,7 @@ const Advisor = () => {
             </div>
 
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
-              💡 <strong>سبب التوصية:</strong> {recommendation.reason}
+              <strong>سبب التوصية:</strong> {recommendation.reason}
             </p>
 
             <h4 style={{ fontSize: '14.5px', fontWeight: 'bold', marginBottom: '12px' }}>المزايا المضمنة في هذه الباقة:</h4>

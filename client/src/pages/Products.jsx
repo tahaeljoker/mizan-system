@@ -263,7 +263,7 @@ const Products = () => {
         const newProductsList = [...imported, ...safeProductsList];
         setProductsList(newProductsList);
         localStorage.setItem('mizan_products', JSON.stringify(newProductsList));
-        alert(`تم استيراد ${imported.length} صنف جديد بنجاح وتحديث القاعدة! 🎉`);
+        alert(`تم استيراد ${imported.length} صنف جديد بنجاح وتحديث القاعدة.`);
       }
     });
   };
@@ -316,7 +316,7 @@ const Products = () => {
               style={{ fontSize: '13px', background: showOnlyDeadStock ? 'var(--danger)' : '', borderColor: showOnlyDeadStock ? 'var(--danger)' : '' }}
               onClick={() => setShowOnlyDeadStock(!showOnlyDeadStock)}
             >
-              <span>{showOnlyDeadStock ? 'عرض جميع المنتجات' : '⚠️ تصفية الراكد (عديم الحركة 60 يوم)'}</span>
+              <span>{showOnlyDeadStock ? 'عرض جميع المنتجات' : 'تصفية الراكد (عديم الحركة 60 يوم)'}</span>
             </button>
 
             <select 
@@ -365,7 +365,7 @@ const Products = () => {
                       <td style={{ fontWeight: 'bold' }}>{p.stock} {p.unit || 'قطعة'}</td>
                       <td>
                         {isLowStock ? (
-                          <span className="badge danger">مخزون منخفض ⚠️</span>
+                          <span className="badge danger">مخزون منخفض</span>
                         ) : (
                           <span className="badge success">متوفر</span>
                         )}
@@ -557,7 +557,7 @@ const Products = () => {
             </div>
 
             <div className="flex justify-center gap-12">
-              <button className="btn btn-secondary" onClick={() => setShowBarcodePrintModal(false)}>إغلاق</button>
+              <button className="btn btn-secondary" onClick={() => setShowBarcodePrintModal(false)}>إلغاء</button>
               <button className="btn btn-primary" onClick={triggerPrintWindow}>
                 <Printer size={16} />
                 <span>طباعة الملصق</span>

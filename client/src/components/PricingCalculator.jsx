@@ -24,7 +24,7 @@ const PricingCalculator = () => {
       name: 'باقة الأعمال (Business)',
       priceMonthly: 999,
       priceYearly: 9990,
-      badge: 'الأكثر ملاءمة لنشاطك ⭐',
+      badge: 'الأكثر ملاءمة لنشاطك',
       reason: `بناءً على طلبك لعدد ${branchesCount} فروع و ${usersCount} مستخدمين.`
     };
 
@@ -34,7 +34,7 @@ const PricingCalculator = () => {
         name: 'الباقة الاحترافية (Professional)',
         priceMonthly: 1999,
         priceYearly: 19990,
-        badge: 'أقصى أداء وتوسع ⚡',
+        badge: 'أقصى أداء وتوسع',
         reason: 'تتطلب إمكانيات غير محدودة للفروع والمستخدمين مع وصول الـ API ومساعد الذكاء الاصطناعي.'
       };
     } else if (branchesCount > 5 || usersCount > 20 || needAi || needApi) {
@@ -43,7 +43,7 @@ const PricingCalculator = () => {
         name: 'الباقة الاحترافية (Professional)',
         priceMonthly: 1999,
         priceYearly: 19990,
-        badge: 'أقصى أداء وتوسع ⚡',
+        badge: 'أقصى أداء وتوسع',
         reason: 'تحتاج إلى مساعد الذكاء الاصطناعي والوصول المباشر للـ API.'
       };
     } else if (branchesCount === 1 && usersCount <= 3 && !needAccounting && !needAi && !needReps) {
@@ -52,7 +52,7 @@ const PricingCalculator = () => {
         name: 'الباقة المبتدئة (Starter)',
         priceMonthly: 499,
         priceYearly: 4990,
-        badge: 'الأوفر للمشروع الناشئ 💡',
+        badge: 'الأوفر للمشروع الناشئ',
         reason: 'تناسب فرع واحد و 3 مستخدمين مع نقاط البيع والمخزون الأساسي.'
       };
     }
@@ -87,7 +87,7 @@ const PricingCalculator = () => {
           <Calculator size={26} />
         </div>
         <div>
-          <h3 style={{ fontSize: '22px', fontWeight: 'bold', margin: 0 }}>حاسبة التكلفة والباقة الذكية 🧮</h3>
+          <h3 style={{ fontSize: '22px', fontWeight: 'bold', margin: 0 }}>حاسبة التكلفة والباقة الذكية</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', margin: '4px 0 0 0' }}>حدد احتياجات مؤسستك وسيقوم النظام باحتساب الباقة والتقدير المالي الدقيق فوراً</p>
         </div>
       </div>
@@ -182,7 +182,7 @@ const PricingCalculator = () => {
               {result.priceMonthly.toLocaleString()} EGP <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>/ شهرياً</span>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--success)', fontWeight: 'bold', marginTop: '4px' }}>
-              أو {result.priceYearly.toLocaleString()} EGP سنوياً (وفر شهرين مجاناً 🎁)
+              أو {result.priceYearly.toLocaleString()} EGP سنوياً (خصم شهرين مجاناً)
             </div>
           </div>
 
