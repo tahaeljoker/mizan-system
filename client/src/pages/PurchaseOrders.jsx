@@ -30,9 +30,14 @@ const PurchaseOrders = () => {
     queryFn: () => apiService.products.getAll()
   });
 
-  const ordersList = poData?.purchaseOrders || poData || [];
-  const suppliersList = suppliersData?.suppliers || suppliersData || [];
-  const productsList = productsData?.products || productsData || [];
+  const rawOrders = poData?.data || poData?.purchaseOrders || poData;
+  const ordersList = Array.isArray(rawOrders) ? rawOrders : [];
+
+  const rawSuppliers = suppliersData?.data || suppliersData?.suppliers || suppliersData;
+  const suppliersList = Array.isArray(rawSuppliers) ? rawSuppliers : [];
+
+  const rawProducts = productsData?.data || productsData?.products || productsData;
+  const productsList = Array.isArray(rawProducts) ? rawProducts : [];
 
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [orderItems, setOrderItems] = useState([
@@ -61,268 +66,216 @@ const PurchaseOrders = () => {
     setOrderItems([...orderItems, { productId: '', name: '', quantity: 1, costPrice: 0 }]);
   };
 
-  const handleRemoveItemRow = (idx) => {
-    setOrderItems(orderItems.filter((_, i) => i !== idx));
-  };
-
-  const handleItemChange = (idx, field, value) => {
-    const updated = orderItems.map((item, i) => {
-      if (i === idx) {
-        let updatedItem = { ...item, [field]: value };
-        if (field === 'productId') {
-          const prod = productsList.find(p => p._id === value || p.id === value);
-          if (prod) {
-            updatedItem.name = prod.name;
-            updatedItem.costPrice = prod.costPrice || 0;
-          }
-        }
-        return updatedItem;
-      }
-      return item;
-    });
+  const handleProductSelect = (index, productId) => {
+    const prod = productsList.find(p => p._id === productId || p.id === productId);
+    const updated = [...orderItems];
+    updated[index] = {
+      productId: productId,
+      name: prod?.name || '',
+      quantity: updated[index].quantity || 1,
+      costPrice: prod?.costPrice || 0
+    };
     setOrderItems(updated);
   };
 
-  const getOrderTotal = () => {
-    return orderItems.reduce((sum, item) => sum + (item.quantity * (parseFloat(item.costPrice) || 0)), 0);
+  const handleItemChange = (index, field, value) => {
+    const updated = [...orderItems];
+    updated[index][field] = value;
+    setOrderItems(updated);
   };
 
-  const handleCreateOrder = (e) => {
+  const handleSubmitNewPO = (e) => {
     e.preventDefault();
-    if (!selectedSupplierId) {
-      alert('اختر المورد أولاً');
-      return;
-    }
-    if (orderItems.length === 0 || !orderItems[0].productId) {
-      alert('اختر منتج واحد على الأقل للمذكرة!');
-      return;
-    }
+    if (!selectedSupplierId || orderItems.length === 0) return;
 
-    const payload = {
+    const validItems = orderItems.filter(i => i.productId && i.quantity > 0);
+    if (validItems.length === 0) return;
+
+    const totalCost = validItems.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.costPrice)), 0);
+
+    createPOMutation.mutate({
       supplierId: selectedSupplierId,
-      items: orderItems.map(item => ({
-        productId: item.productId,
-        name: item.name,
-        quantity: parseInt(item.quantity) || 1,
-        costPrice: parseFloat(item.costPrice) || 0,
-        total: (parseInt(item.quantity) || 1) * (parseFloat(item.costPrice) || 0)
-      })),
-      totalAmount: getOrderTotal(),
-      paymentStatus: 'UNPAID'
-    };
-
-    createPOMutation.mutate(payload);
-  };
-
-  const handleMarkReceived = (orderId) => {
-    if (window.confirm('هل تريد تأكيد استلام البضائع؟ سيتم زيادة كميات المنتجات في المخازن تلقائياً.')) {
-      receivePOMutation.mutate(orderId);
-    }
-  };
-
-  const handleViewOrder = (order) => {
-    setSelectedOrder(order);
-    setShowViewModal(true);
+      items: validItems,
+      totalAmount: totalCost
+    });
   };
 
   return (
     <div>
       <div className="flex justify-between align-center mb-24">
         <div>
-          <h1 style={{ fontSize: '28px' }}>طلبات الشراء والتوريد (PO)</h1>
-          <p style={{ color: 'var(--text-muted)' }}>إدارة الفواتير الواردة من الموردين، وإدخال الكميات الجديدة للمخازن.</p>
+          <h1 style={{ fontSize: '28px' }}>أوامر الشراء والتوريد</h1>
+          <p style={{ color: 'var(--text-muted)' }}>إدارة فواتير التوريد من الموردين وتسليمات شحنات البضاعة بالمخزن.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
           <Plus size={18} />
-          <span>طلب توريد جديد</span>
+          <span>إصدار أمر شراء جديد</span>
         </button>
       </div>
 
       <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>رقم الطلب</th>
-                <th>المورد</th>
-                <th>التاريخ</th>
-                <th>إجمالي الفاتورة</th>
-                <th>حالة التوريد</th>
-                <th style={{ textAlign: 'center' }}>الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan="6" style={{ textAlign: 'center' }}>جاري تحميل طلبات التوريد...</td></tr>
-              ) : ordersList.length > 0 ? (
-                ordersList.map((order) => (
-                  <tr key={order._id || order.id}>
-                    <td style={{ fontWeight: '600', color: 'var(--primary)' }}>{order.poNumber || order._id}</td>
-                    <td style={{ fontWeight: '600' }}>{order.supplierId?.name || order.supplier || 'مورد'}</td>
-                    <td>
-                      <div className="flex align-center gap-8" style={{ color: 'var(--text-muted)' }}>
-                        <Calendar size={14} />
-                        <span>{new Date(order.createdAt || order.date).toLocaleDateString('ar-EG')}</span>
-                      </div>
-                    </td>
-                    <td style={{ fontWeight: 'bold' }}>{(order.totalAmount || order.total || 0).toLocaleString()} ج.م</td>
-                    <td>
-                      <span className={`badge ${order.status === 'RECEIVED' ? 'success' : 'warning'}`}>
-                        {order.status === 'RECEIVED' ? 'تم الاستلام والشحن' : 'بانتظار وصول البضاعة'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="flex align-center justify-center gap-8">
-                        <button 
-                          className="btn btn-secondary btn-sm" 
-                          onClick={() => handleViewOrder(order)}
-                        >
-                          <Eye size={12} />
-                          <span>تفاصيل</span>
-                        </button>
+        <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>سجل أوامر التوريد والشراء</h3>
 
-                        {order.status !== 'RECEIVED' && (
-                          <button 
-                            className="btn btn-primary btn-sm" 
-                            style={{ background: 'var(--success)' }}
-                            onClick={() => handleMarkReceived(order._id || order.id)}
-                          >
-                            <Check size={12} />
-                            <span>استلام</span>
-                          </button>
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            جاري تحميل أوامر الشراء...
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>رقم الطلب</th>
+                  <th>المورد</th>
+                  <th>عدد الأصناف</th>
+                  <th>الإجمالي (ج.م)</th>
+                  <th>الحالة</th>
+                  <th>التاريخ</th>
+                  <th>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordersList.length > 0 ? (
+                  ordersList.map((po) => (
+                    <tr key={po._id || po.id}>
+                      <td style={{ fontWeight: 'bold' }}>{po.orderNumber || po._id}</td>
+                      <td>{po.supplierName || po.supplierId?.name || 'مورد عام'}</td>
+                      <td>{po.items?.length || 0} أصناف</td>
+                      <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
+                        {(po.totalAmount || 0).toLocaleString()} ج.م
+                      </td>
+                      <td>
+                        {po.status === 'RECEIVED' ? (
+                          <span className="badge success">تم الاستلام بالمخزن</span>
+                        ) : (
+                          <span className="badge warning">قيد الانتظار والتوريد</span>
                         )}
-                      </div>
+                      </td>
+                      <td>{po.createdAt ? new Date(po.createdAt).toLocaleDateString('ar-EG') : 'اليوم'}</td>
+                      <td>
+                        <div className="flex gap-8">
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '12px' }}
+                            onClick={() => { setSelectedOrder(po); setShowViewModal(true); }}
+                          >
+                            <Eye size={14} />
+                            <span>معاينة</span>
+                          </button>
+                          {po.status !== 'RECEIVED' && (
+                            <button
+                              className="btn btn-primary"
+                              style={{ padding: '4px 10px', fontSize: '12px' }}
+                              onClick={() => receivePOMutation.mutate(po._id || po.id)}
+                            >
+                              <Check size={14} />
+                              <span>تأكيد الاستلام</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                      لا توجد أوامر شراء مسجلة حالياً.
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد طلبات توريد حالية</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Modal Add PO */}
       {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '650px' }}>
-            <div className="modal-header">
-              <h3>إنشاء طلب توريد جديد</h3>
-              <button className="close-btn" onClick={() => setShowAddModal(false)}><X size={20} /></button>
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-ar)'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 'var(--radius-lg)',
+            width: '100%',
+            maxWidth: '650px',
+            padding: '24px',
+            direction: 'rtl'
+          }}>
+            <div className="flex justify-between align-center mb-16">
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>إصدار أمر شراء وبضاعة جديدة</h3>
+              <X size={20} style={{ cursor: 'pointer' }} onClick={() => setShowAddModal(false)} />
             </div>
-            <form onSubmit={handleCreateOrder}>
+
+            <form onSubmit={handleSubmitNewPO}>
               <div className="form-group mb-16">
-                <label className="form-label">اختر المورد *</label>
-                <select 
-                  className="form-control" 
+                <label>اختر المورد *</label>
+                <select
                   value={selectedSupplierId}
                   onChange={(e) => setSelectedSupplierId(e.target.value)}
                   required
                 >
-                  <option value="">-- اختر مورد --</option>
+                  <option value="">-- اختر المورد من القائمة --</option>
                   {suppliersList.map(s => (
-                    <option key={s._id || s.id} value={s._id || s.id}>{s.name}</option>
+                    <option key={s._id || s.id} value={s._id || s.id}>{s.name} ({s.company || 'شركة'})</option>
                   ))}
                 </select>
               </div>
 
-              <h4 style={{ fontSize: '15px', marginBottom: '12px' }}>أصناف الطلبية:</h4>
-              {orderItems.map((item, idx) => (
-                <div key={idx} className="flex gap-8 mb-12 align-center">
-                  <select 
-                    className="form-control" 
-                    value={item.productId}
-                    onChange={(e) => handleItemChange(idx, 'productId', e.target.value)}
-                    required
-                  >
-                    <option value="">-- اختر المنتج --</option>
-                    {productsList.map(p => (
-                      <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                  <input 
-                    type="number" 
-                    placeholder="الكمية"
-                    className="form-control" 
-                    style={{ width: '100px' }}
-                    value={item.quantity}
-                    onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                    min="1"
-                    required
-                  />
-                  <input 
-                    type="number" 
-                    placeholder="سعر الشراء"
-                    className="form-control" 
-                    style={{ width: '120px' }}
-                    value={item.costPrice}
-                    onChange={(e) => handleItemChange(idx, 'costPrice', e.target.value)}
-                    required
-                  />
-                  {orderItems.length > 1 && (
-                    <button type="button" className="btn btn-secondary btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleRemoveItemRow(idx)}>
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button type="button" className="btn btn-secondary btn-sm mb-16" onClick={handleAddItemRow}>
-                + إضافة صنف آخر
-              </button>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', display: 'block' }}>قائمة البضاعة المطلوبة:</label>
+                {orderItems.map((item, idx) => (
+                  <div key={idx} className="flex gap-8 mb-8" style={{ alignItems: 'center' }}>
+                    <select
+                      style={{ flex: 2 }}
+                      value={item.productId}
+                      onChange={(e) => handleProductSelect(idx, e.target.value)}
+                      required
+                    >
+                      <option value="">-- اختر الصنف --</option>
+                      {productsList.map(p => (
+                        <option key={p._id || p.id} value={p._id || p.id}>{p.name}</option>
+                      ))}
+                    </select>
 
-              <div className="flex justify-between align-center mb-16 p-12" style={{ background: 'var(--bg-app)', borderRadius: '8px' }}>
-                <span style={{ fontWeight: 'bold' }}>إجمالي الفاتورة:</span>
-                <span style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--primary)' }}>{getOrderTotal().toLocaleString()} ج.م</span>
+                    <input
+                      type="number"
+                      placeholder="الكمية"
+                      style={{ flex: 1 }}
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(idx, 'quantity', Number(e.target.value))}
+                      required
+                    />
+
+                    <input
+                      type="number"
+                      placeholder="سعر التكلفة"
+                      style={{ flex: 1 }}
+                      value={item.costPrice}
+                      onChange={(e) => handleItemChange(idx, 'costPrice', Number(e.target.value))}
+                    />
+                  </div>
+                ))}
+
+                <button type="button" className="btn btn-secondary" style={{ fontSize: '12px', marginTop: '4px' }} onClick={handleAddItemRow}>
+                  + إضافة صنف آخر للأمر
+                </button>
               </div>
 
-              <div className="flex gap-12 justify-end">
+              <div className="flex justify-end gap-12 mt-24">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">حفظ وإرسال الطلب</button>
+                <button type="submit" className="btn btn-primary">إصدار وترحيل أمر الشراء</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal View PO */}
-      {showViewModal && selectedOrder && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>تفاصيل طلب التوريد ({selectedOrder.poNumber || selectedOrder._id})</h3>
-              <button className="close-btn" onClick={() => setShowViewModal(false)}><X size={20} /></button>
-            </div>
-            <div className="mb-16">
-              <p><strong>المورد:</strong> {selectedOrder.supplierId?.name || selectedOrder.supplier}</p>
-              <p><strong>الحالة:</strong> {selectedOrder.status}</p>
-              <p><strong>الإجمالي:</strong> {(selectedOrder.totalAmount || selectedOrder.total || 0).toLocaleString()} ج.م</p>
-            </div>
-            <div className="table-container mb-16">
-              <table>
-                <thead>
-                  <tr>
-                    <th>المنتج</th>
-                    <th>الكمية</th>
-                    <th>سعر الشراء</th>
-                    <th>الإجمالي</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedOrder.items?.map((it, idx) => (
-                    <tr key={idx}>
-                      <td>{it.name}</td>
-                      <td>{it.quantity || it.qty}</td>
-                      <td>{(it.costPrice || 0).toLocaleString()} ج.م</td>
-                      <td>{((it.quantity || it.qty || 0) * (it.costPrice || 0)).toLocaleString()} ج.م</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="flex justify-end">
-              <button className="btn btn-secondary" onClick={() => setShowViewModal(false)}>إغلاق</button>
-            </div>
           </div>
         </div>
       )}

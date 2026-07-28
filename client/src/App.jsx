@@ -25,6 +25,7 @@ const PriceChecker = lazy(() => import('./pages/PriceChecker'));
 const CashierShift = lazy(() => import('./pages/CashierShift'));
 const TransferLogs = lazy(() => import('./pages/TransferLogs'));
 const Returns = lazy(() => import('./pages/Returns'));
+const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -163,6 +164,11 @@ function App() {
                 <Route path="/suppliers" element={
                   <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
                     <Suppliers />
+                  </AuthWrapper>
+                } />
+                <Route path="/purchase-orders" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                    <PurchaseOrders />
                   </AuthWrapper>
                 } />
                 <Route path="/customers" element={

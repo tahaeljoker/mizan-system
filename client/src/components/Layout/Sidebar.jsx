@@ -141,6 +141,7 @@ const Sidebar = ({ isOpen, toggleSidebar, onLogout }) => {
           { path: '/products', name: 'الأصناف والمنتجات' },
           storedFeatures.inventory && { path: '/inventory', name: 'حركة المخزن وجلسات الجرد' },
           storedFeatures.inventory && { path: '/transfer-logs', name: 'التحويلات بين الفروع' },
+          storedFeatures.purchases && { path: '/purchase-orders', name: 'أوامر الشراء والتوريد' },
           storedFeatures.suppliers && { path: '/suppliers', name: 'الموردين وفواتير الشراء' }
         ].filter(Boolean)
       },
