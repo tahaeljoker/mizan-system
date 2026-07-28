@@ -302,6 +302,36 @@ export const getJournalEntries = async (req, res) => {
   }
 };
 
+export const getGeneralLedger = async (req, res) => {
+  try {
+    const ledger = await financeService.getGeneralLedger(req.query, req.user);
+    return successResponse(res, { ledger }, 'General ledger fetched successfully', 200);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return errorResponse(res, error.message || 'Failed to fetch general ledger', statusCode);
+  }
+};
+
+export const getTrialBalance = async (req, res) => {
+  try {
+    const trialBalance = await financeService.getTrialBalance(req.query, req.user);
+    return successResponse(res, { trialBalance }, 'Trial balance fetched successfully', 200);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return errorResponse(res, error.message || 'Failed to fetch trial balance', statusCode);
+  }
+};
+
+export const getChartOfAccounts = async (req, res) => {
+  try {
+    const coa = await financeService.getChartOfAccounts(req.query, req.user);
+    return successResponse(res, { accounts: coa }, 'Chart of accounts fetched successfully', 200);
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    return errorResponse(res, error.message || 'Failed to fetch chart of accounts', statusCode);
+  }
+};
+
 /* ==========================================================================
    5. FINANCIAL REPORTS & DASHBOARDS
    ========================================================================== */

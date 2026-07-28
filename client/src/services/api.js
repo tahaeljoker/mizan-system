@@ -440,6 +440,18 @@ export const apiService = {
       const response = await api.post('/finance/journal-entries', data);
       return response.data.entry;
     },
+    getGeneralLedger: async (params) => {
+      const response = await api.get('/finance/ledger', { params });
+      return response.data.ledger;
+    },
+    getTrialBalance: async (params) => {
+      const response = await api.get('/finance/trial-balance', { params });
+      return response.data.trialBalance;
+    },
+    getChartOfAccounts: async (params) => {
+      const response = await api.get('/finance/chart-of-accounts', { params });
+      return response.data.accounts;
+    },
     getDashboard: async (params) => {
       const response = await api.get('/finance/dashboard', { params });
       return response.data.dashboard;

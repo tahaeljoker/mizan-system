@@ -27,6 +27,12 @@ const TransferLogs = lazy(() => import('./pages/TransferLogs'));
 const Returns = lazy(() => import('./pages/Returns'));
 const PurchaseOrders = lazy(() => import('./pages/PurchaseOrders'));
 
+// Accounting & Ledger Pages (Phase 15.2)
+const JournalEntries = lazy(() => import('./pages/JournalEntries'));
+const Ledger = lazy(() => import('./pages/Ledger'));
+const TrialBalance = lazy(() => import('./pages/TrialBalance'));
+const ChartOfAccounts = lazy(() => import('./pages/ChartOfAccounts'));
+
 // Loading Fallback Component
 const PageLoader = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', flexDirection: 'column', gap: '12px', color: 'var(--primary)' }}>
@@ -55,7 +61,7 @@ const AuthWrapper = ({ role, allowedRoles, children }) => {
         </div>
         <h2 style={{ fontSize: '20px', color: 'var(--text-main)', marginBottom: '8px', fontWeight: 'bold' }}>صلاحية الوصول غير كافية 🔒</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.6' }}>
-          هذه الصفحة مخصصة لمدراء النظام وملاك المحل فقط. يرجى مراجعة إدارة الفرع للحصول على صلاحيات الترقية.
+          هذه الصفحة مخصصة لمدراء النظام والمحاسبين فقط. يرجى مراجعة إدارة الفرع للحصول على صلاحيات الترقية.
         </p>
       </div>
     );
@@ -142,7 +148,7 @@ function App() {
               <Routes>
                 <Route path="/" element={getHomeElement()} />
                 <Route path="/price-checker" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier', 'staff']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier', 'staff', 'accountant']}>
                     <PriceChecker />
                   </AuthWrapper>
                 } />
@@ -152,32 +158,55 @@ function App() {
                   </AuthWrapper>
                 } />
                 <Route path="/products" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
                     <Products />
                   </AuthWrapper>
                 } />
                 <Route path="/inventory" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'staff']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'staff', 'accountant']}>
                     <Inventory />
                   </AuthWrapper>
                 } />
                 <Route path="/suppliers" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
                     <Suppliers />
                   </AuthWrapper>
                 } />
                 <Route path="/purchase-orders" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
                     <PurchaseOrders />
                   </AuthWrapper>
                 } />
                 <Route path="/customers" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
                     <Customers />
                   </AuthWrapper>
                 } />
+
+                {/* Accountant & Double-Entry Accounting Routes (Phase 15.2) */}
+                <Route path="/accounting/journal-entries" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
+                    <JournalEntries />
+                  </AuthWrapper>
+                } />
+                <Route path="/accounting/ledger" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
+                    <Ledger />
+                  </AuthWrapper>
+                } />
+                <Route path="/accounting/trial-balance" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
+                    <TrialBalance />
+                  </AuthWrapper>
+                } />
+                <Route path="/accounting/chart-of-accounts" element={
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
+                    <ChartOfAccounts />
+                  </AuthWrapper>
+                } />
+
                 <Route path="/reports" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
                     <Reports />
                   </AuthWrapper>
                 } />
@@ -192,12 +221,12 @@ function App() {
                   </AuthWrapper>
                 } />
                 <Route path="/cashier-shift" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier', 'accountant']}>
                     <CashierShift />
                   </AuthWrapper>
                 } />
                 <Route path="/returns" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'cashier', 'accountant']}>
                     <Returns />
                   </AuthWrapper>
                 } />
@@ -212,12 +241,12 @@ function App() {
                   </AuthWrapper>
                 } />
                 <Route path="/expenses" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
                     <Expenses />
                   </AuthWrapper>
                 } />
                 <Route path="/transfer-logs" element={
-                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager']}>
+                  <AuthWrapper role={user.role} allowedRoles={['owner', 'manager', 'accountant']}>
                     <TransferLogs />
                   </AuthWrapper>
                 } />

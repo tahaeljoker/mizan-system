@@ -58,4 +58,8 @@ router.post('/supplier-payments', authorizeRoles('owner', 'admin', 'manager', 'a
 router.get('/journal-entries', authorizeRoles('owner', 'admin', 'accountant'), financeController.getJournalEntries);
 router.post('/journal-entries', authorizeRoles('owner', 'admin', 'accountant'), financeController.createJournalEntry);
 
+router.get('/ledger', authorizeRoles('owner', 'admin', 'accountant'), financeController.getGeneralLedger);
+router.get('/trial-balance', authorizeRoles('owner', 'admin', 'accountant'), financeController.getTrialBalance);
+router.get('/chart-of-accounts', authorizeRoles('owner', 'admin', 'accountant'), financeController.getChartOfAccounts);
+
 export default router;
