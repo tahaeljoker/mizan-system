@@ -15,59 +15,54 @@ const PricingCalculator = () => {
   const [needAi, setNeedAi] = useState(false);
   const [needWhiteLabel, setNeedWhiteLabel] = useState(false);
 
-  // Dynamic Calculation Engine - Updates price live on every slider & checkbox change
+  // Dynamic Smooth Linear Calculation Engine
   const calculateResult = () => {
-    let basePrice = 499;
+    // Determine Base Plan Tier according to scale
     let planKey = 'STARTER';
     let planName = 'الباقة المبتدئة (Starter)';
     let badge = 'الأوفر للمشروع الناشئ';
     let reason = `تناسب مشروعك الحالي بحجم ${branchesCount} فرع و ${usersCount} مستخدمين.`;
+    let basePrice = 499;
 
-    // Determine Base Plan Tier based on scale & features
-    if (branchesCount > 10 || usersCount > 20 || needWhiteLabel || warehousesCount > 5) {
+    if (branchesCount > 8 || usersCount > 20 || needWhiteLabel || warehousesCount > 5) {
       planKey = 'ENTERPRISE';
       planName = 'باقة المؤسسات (Enterprise)';
-      basePrice = 2999;
       badge = 'حل سحابي مخصص للمؤسسات الكبرى';
       reason = 'تتطلب سيرفر خاص وتجهيز مخصص للفروع المتعددة والعلامة التجارية.';
-    } else if (branchesCount > 5 || usersCount > 10 || needAi) {
+      basePrice = 2999;
+    } else if (branchesCount > 4 || usersCount > 10 || needAi) {
       planKey = 'PROFESSIONAL';
       planName = 'الباقة الاحترافية (Professional)';
-      basePrice = 1999;
       badge = 'أقصى أداء وتوسع';
-      reason = 'تتضمن وصول مساعد الذكاء الاصطناعي وإدارة الفروع المتعددة والـ API.';
+      reason = 'تتضمن وصول مساعد الذكاء الاصطناعي وإدارة الفروع المتعددة.';
+      basePrice = 1999;
     } else if (branchesCount > 1 || usersCount > 3 || needAccounting || warehousesCount > 1) {
       planKey = 'BUSINESS';
       planName = 'باقة الأعمال (Business)';
-      basePrice = 999;
       badge = 'الأكثر ملاءمة لنشاطك المتوسع';
       reason = 'تغطي المحاسبة المزدوجة والفروع المتعددة والمخازن بكفاءة عالية.';
+      basePrice = 999;
     }
 
-    // Dynamic Price Additions based on exact counts & checked features
-    let extraBranchesFee = 0;
-    if (planKey === 'STARTER' && branchesCount > 1) {
-      extraBranchesFee = (branchesCount - 1) * 150;
-    } else if (planKey === 'BUSINESS' && branchesCount > 3) {
-      extraBranchesFee = (branchesCount - 3) * 150;
-    } else if (planKey === 'PROFESSIONAL' && branchesCount > 8) {
-      extraBranchesFee = (branchesCount - 8) * 150;
-    }
+    // Incremental Linear Cost Calculation
+    // Extra Branches: +150 EGP / branch above 1
+    const extraBranchesFee = (branchesCount - 1) * 150;
 
-    let extraUsersFee = 0;
-    if (planKey === 'STARTER' && usersCount > 3) {
-      extraUsersFee = (usersCount - 3) * 50;
-    } else if (planKey === 'BUSINESS' && usersCount > 10) {
-      extraUsersFee = (usersCount - 10) * 50;
-    }
+    // Extra Users: +50 EGP / user above 2
+    const extraUsersFee = (usersCount - 2) * 50;
 
+    // Extra Warehouses: +100 EGP / warehouse above 1
+    const extraWarehousesFee = (warehousesCount - 1) * 100;
+
+    // Add-on Features Costs
     let addOnsFee = 0;
-    if (needAccounting && planKey === 'STARTER') addOnsFee += 200;
-    if (needAi && planKey !== 'PROFESSIONAL' && planKey !== 'ENTERPRISE') addOnsFee += 300;
-    if (needWhiteLabel && planKey !== 'ENTERPRISE') addOnsFee += 500;
+    if (needAccounting) addOnsFee += 200;
+    if (needAi) addOnsFee += 300;
+    if (needWhiteLabel) addOnsFee += 500;
 
-    const totalMonthly = basePrice + extraBranchesFee + extraUsersFee + addOnsFee;
-    const totalYearly = totalMonthly * 10; // 2 months discount
+    // Calculate Total Monthly Price smoothly
+    const totalMonthly = basePrice + extraBranchesFee + extraUsersFee + extraWarehousesFee + addOnsFee;
+    const totalYearly = totalMonthly * 10; // 2 months free
 
     return {
       planKey,
@@ -78,6 +73,7 @@ const PricingCalculator = () => {
       priceYearly: totalYearly,
       extraBranchesFee,
       extraUsersFee,
+      extraWarehousesFee,
       addOnsFee
     };
   };
@@ -228,14 +224,16 @@ const PricingCalculator = () => {
             </div>
           </div>
 
-          {(result.extraBranchesFee > 0 || result.extraUsersFee > 0 || result.addOnsFee > 0) && (
-            <div style={{ background: '#fff', borderRadius: '8px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '20px', border: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '6px' }}>تفاصيل التكلفة المحتسبة:</div>
-              {result.extraBranchesFee > 0 && <div>• فروع إضافية: +{result.extraBranchesFee} ج.م/شهر</div>}
-              {result.extraUsersFee > 0 && <div>• مستخدمين إضافيين: +{result.extraUsersFee} ج.م/شهر</div>}
-              {result.addOnsFee > 0 && <div>• الإضافات المختارة: +{result.addOnsFee} ج.م/شهر</div>}
-            </div>
-          )}
+          <div style={{ background: '#fff', borderRadius: '8px', padding: '12px', fontSize: '12px', color: 'var(--text-muted)', textAlign: 'right', marginBottom: '20px', border: '1px solid var(--border)' }}>
+            <div style={{ fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '6px' }}>تفاصيل التكلفة المحتسبة:</div>
+            {result.extraBranchesFee > 0 && <div>• فروع إضافية ({branchesCount - 1}): +{result.extraBranchesFee} ج.م/شهر</div>}
+            {result.extraUsersFee > 0 && <div>• مستخدمين إضافيين ({usersCount - 2}): +{result.extraUsersFee} ج.م/شهر</div>}
+            {result.extraWarehousesFee > 0 && <div>• مخازن إضافية ({warehousesCount - 1}): +{result.extraWarehousesFee} ج.م/شهر</div>}
+            {result.addOnsFee > 0 && <div>• الإضافات المختارة: +{result.addOnsFee} ج.م/شهر</div>}
+            {result.extraBranchesFee === 0 && result.extraUsersFee === 0 && result.extraWarehousesFee === 0 && result.addOnsFee === 0 && (
+              <div>• السعر الأساسي الابتدائي للباقة المبتدئة.</div>
+            )}
+          </div>
 
           <button
             className="btn btn-primary"
