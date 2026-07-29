@@ -1,27 +1,65 @@
 import React, { useState } from 'react';
-import { Plus, Search, Edit, Trash2, X, Phone, Mail, Award, DollarSign, Coins } from 'lucide-react';
-import { customers as initialCustomers } from '../data/mockData';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Search, Edit, Trash2, X, Phone, Mail, DollarSign, Coins, FileText, Printer, Download } from 'lucide-react';
+import apiService from '../services/api';
 
 const Customers = () => {
-  // Sync customers list with localStorage
-  const [customersList, setCustomersList] = useState(() => {
-    return JSON.parse(localStorage.getItem('mizan_customers')) || initialCustomers;
-  });
-
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  
+  // Account Statement Modal state
+  const [selectedStatementCustomer, setSelectedStatementCustomer] = useState(null);
+  const [showStatementModal, setShowStatementModal] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     email: '',
-    points: '0'
+    loyaltyPoints: '0'
   });
 
-  const filteredCustomers = customersList.filter(c => 
-    c.name.includes(searchQuery) || c.phone.includes(searchQuery) || (c.email && c.email.includes(searchQuery))
-  );
+  const { data: customersData, isLoading } = useQuery({
+    queryKey: ['customers', searchQuery],
+    queryFn: () => apiService.customers.getAll({ search: searchQuery })
+  });
+
+  const raw = customersData?.data || customersData?.customers || customersData;
+  const customersList = Array.isArray(raw) ? raw : [];
+
+  // Customer Ledger Query
+  const { data: ledgerData, isLoading: loadingLedger } = useQuery({
+    queryKey: ['customerLedger', selectedStatementCustomer?._id || selectedStatementCustomer?.id],
+    queryFn: () => apiService.customers.getLedger(selectedStatementCustomer._id || selectedStatementCustomer.id),
+    enabled: !!selectedStatementCustomer
+  });
+
+  const rawTransactions = ledgerData?.data || ledgerData?.transactions || ledgerData;
+  const statementTransactions = Array.isArray(rawTransactions) ? rawTransactions : [];
+
+  const createMutation = useMutation({
+    mutationFn: (data) => apiService.customers.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setShowModal(false);
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => apiService.customers.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setShowModal(false);
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => apiService.customers.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    }
+  });
 
   const openAddModal = () => {
     setEditingCustomer(null);
@@ -29,107 +67,89 @@ const Customers = () => {
       name: '',
       phone: '',
       email: '',
-      points: '0'
+      loyaltyPoints: '0'
     });
     setShowModal(true);
   };
 
-  const openEditModal = (customer) => {
-    setEditingCustomer(customer);
+  const openEditModal = (c) => {
+    setEditingCustomer(c);
     setFormData({
-      name: customer.name,
-      phone: customer.phone,
-      email: customer.email || '',
-      points: customer.points.toString()
+      name: c.name || '',
+      phone: c.phone || '',
+      email: c.email || '',
+      loyaltyPoints: c.loyaltyPoints || '0'
     });
     setShowModal(true);
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('هل تريد حذف العميل بالفعل؟')) {
-      const updated = customersList.filter(c => c.id !== id);
-      setCustomersList(updated);
-      localStorage.setItem('mizan_customers', JSON.stringify(updated));
+    if (window.confirm('هل أنت تأكد من حذف العميل؟')) {
+      deleteMutation.mutate(id);
     }
   };
 
-  const handleSave = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) return;
+    if (!formData.name) return;
 
-    const payload = {
-      name: formData.name,
-      phone: formData.phone,
-      email: formData.email,
-      points: parseInt(formData.points) || 0
-    };
-
-    let updated = [];
     if (editingCustomer) {
-      updated = customersList.map(c => c.id === editingCustomer.id ? { ...c, ...payload } : c);
+      updateMutation.mutate({
+        id: editingCustomer._id || editingCustomer.id,
+        data: formData
+      });
     } else {
-      updated = [...customersList, { id: 'c' + (customersList.length + 1), ...payload, balance: 0 }];
+      createMutation.mutate(formData);
     }
-    setCustomersList(updated);
-    localStorage.setItem('mizan_customers', JSON.stringify(updated));
-    setShowModal(false);
   };
 
-  // Log a customer paying their debt / credit payment
-  const handleSettlePayment = (customerId) => {
-    const customer = customersList.find(c => c.id === customerId);
-    if (!customer) return;
+  const openStatement = (customer) => {
+    setSelectedStatementCustomer(customer);
+    setShowStatementModal(true);
+  };
 
-    if (customer.balance <= 0) {
-      alert('ممتاز! هذا العميل لا توجد عليه أي ديون لتسديدها حالياً.');
-      return;
-    }
+  const handlePrintStatement = () => {
+    window.print();
+  };
 
-    const payInput = prompt(`تسديد ديون العميل: ${customer.name}\nالمديونية الحالية: ${customer.balance} ج.م\nالرجاء إدخال القيمة المدفوعة نقداً (ج.م):`);
-    if (payInput === null) return; // Cancelled
-
-    const payAmount = parseFloat(payInput) || 0;
-    if (payAmount <= 0) {
-      alert('من فضلك أدخل مبلغ تسوية صحيح!');
-      return;
-    }
-
-    if (payAmount > customer.balance) {
-      alert('لا يمكن تسديد مبلغ أكبر من قيمة الدين الفعلي!');
-      return;
-    }
-
-    const updated = customersList.map(c => {
-      if (c.id === customerId) {
-        return { ...c, balance: Math.max(0, c.balance - payAmount) };
-      }
-      return c;
-    });
-
-    setCustomersList(updated);
-    localStorage.setItem('mizan_customers', JSON.stringify(updated));
-    alert(`تم تسجيل تسوية الديون بنجاح! المبلغ المسدد: ${payAmount} ج.م. المديونية المتبقية: ${customer.balance - payAmount} ج.م ✅`);
+  const handleExportStatementCSV = () => {
+    const headers = ['تاريخ الحركة', 'نوع المعاملة', 'البيان والمرجع', 'المبلغ', 'الرصيد التراكمي'];
+    const rows = statementTransactions.map(t => [
+      new Date(t.createdAt || t.date).toLocaleDateString('ar-EG'),
+      t.type || 'فاتورة/سداد',
+      `"${t.reference || 'معاملة آجل'}"`,
+      t.amount || 0,
+      t.balanceAfter || 0
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `customer_statement_${selectedStatementCustomer.name}_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
     <div>
       <div className="flex justify-between align-center mb-24">
         <div>
-          <h1 style={{ fontSize: '28px' }}>إدارة العملاء</h1>
-          <p style={{ color: 'var(--text-muted)' }}>لوحة المبيعات الآجلة، برامج الولاء ونقاط المكافآت لعملاء المحل.</p>
+          <h1 style={{ fontSize: '28px' }}>إدارة العملاء وكشوف الحسابات</h1>
+          <p style={{ color: 'var(--text-muted)' }}>متابعة بيانات العملاء، النقاط، المستحقات الآجلة، وكشوف الحسابات التفصيلية.</p>
         </div>
         <button className="btn btn-primary" onClick={openAddModal}>
           <Plus size={18} />
-          <span>تسجيل عميل جديد</span>
+          <span>إضافة عميل جديد</span>
         </button>
       </div>
 
       <div className="card mb-24" style={{ padding: '16px' }}>
-        <div className="header-search" style={{ width: '100%' }}>
+        <div className="header-search" style={{ width: '320px' }}>
           <Search size={18} />
-          <input 
-            type="text" 
-            placeholder="البحث باسم العميل أو رقم التليفون لفرز الحسابات المديرة..." 
+          <input
+            type="text"
+            placeholder="البحث باسم العميل أو رقم الهاتف..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -137,146 +157,236 @@ const Customers = () => {
       </div>
 
       <div className="card">
-        <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>قائمة العملاء المشتركين بالمتجر</h3>
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>اسم العميل</th>
-                <th>الهاتف</th>
-                <th>البريد الإلكتروني</th>
-                <th>نقاط الولاء</th>
-                <th>المستحقات الآجلة (الديون)</th>
-                <th style={{ textAlign: 'center' }}>الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCustomers.map((c) => (
-                <tr key={c.id}>
-                  <td style={{ fontWeight: '600' }}>{c.name}</td>
-                  <td>
-                    <div className="flex align-center gap-8" style={{ direction: 'ltr', justifyContent: 'flex-end' }}>
-                      <span>{c.phone}</span>
-                      <Phone size={14} style={{ color: 'var(--text-muted)' }} />
-                    </div>
-                  </td>
-                  <td>
-                    {c.email ? (
-                      <div className="flex align-center gap-8">
-                        <Mail size={14} style={{ color: 'var(--text-muted)' }} />
-                        <span>{c.email}</span>
-                      </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-dark)' }}>غير متوفر</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="flex align-center gap-8" style={{ color: 'var(--warning)', fontWeight: 'bold' }}>
-                      <Award size={16} />
-                      <span>{c.points} نقطة</span>
-                    </div>
-                  </td>
-                  <td>
-                    {c.balance > 0 ? (
-                      <span className="text-danger" style={{ fontWeight: 'bold' }}>
-                        عليه ديون: {c.balance.toLocaleString()} ج.م
-                      </span>
-                    ) : (
-                      <span className="text-success" style={{ fontWeight: 'bold' }}>
-                        لا توجد مستحقات
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <div className="flex align-center justify-between" style={{ width: '130px', margin: '0 auto', gap: '8px' }}>
-                      {c.balance > 0 && (
-                        <button 
-                          onClick={() => handleSettlePayment(c.id)}
-                          className="btn btn-secondary" 
-                          style={{ padding: '6px 10px', fontSize: '11px', display: 'flex', gap: '4px', background: 'var(--success-glow)', color: 'var(--success)', border: '1px solid var(--success)' }}
-                          title="تسديد المديونية"
-                        >
-                          <Coins size={12} />
-                          <span>تسديد</span>
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => openEditModal(c)}
-                        style={{ background: 'none', border: 'none', color: 'var(--info)', cursor: 'pointer' }}
-                        title="تعديل"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(c.id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer' }}
-                        title="حذف"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+        {isLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            جاري تحميل قائمة العملاء...
+          </div>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>اسم العميل</th>
+                  <th>رقم الهاتف</th>
+                  <th>البريد الإلكتروني</th>
+                  <th>نقاط الولاء</th>
+                  <th>الرصيد المستحق (آجل)</th>
+                  <th>كشف الحساب والإجراءات</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {customersList.length > 0 ? (
+                  customersList.map((c) => (
+                    <tr key={c._id || c.id}>
+                      <td style={{ fontWeight: 'bold' }}>{c.name}</td>
+                      <td>{c.phone || 'غير مسجل'}</td>
+                      <td>{c.email || 'غير مسجل'}</td>
+                      <td>
+                        <span className="badge warning flex align-center gap-4" style={{ display: 'inline-flex' }}>
+                          <Coins size={14} />
+                          <span>{c.loyaltyPoints || 0} نقطة</span>
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 'bold', color: (c.balance || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                        {(c.balance || 0).toLocaleString()} ج.م
+                      </td>
+                      <td>
+                        <div className="flex gap-8">
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '4px 10px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => openStatement(c)}
+                          >
+                            <FileText size={14} />
+                            <span>كشف حساب</span>
+                          </button>
+                          <button className="action-btn text-primary" onClick={() => openEditModal(c)} title="تعديل">
+                            <Edit size={16} />
+                          </button>
+                          <button className="action-btn text-danger" onClick={() => handleDelete(c._id || c.id)} title="حذف">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                      لا يوجد عملاء مسجلون حالياً.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
+      {/* Add / Edit Customer Modal */}
       {showModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3>{editingCustomer ? 'تعديل بيانات عميل' : 'تسجيل عميل جديد'}</h3>
-              <X className="modal-close" onClick={() => setShowModal(false)} />
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'var(--font-ar)'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: 'var(--radius-lg)',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '24px',
+            direction: 'rtl'
+          }}>
+            <div className="flex justify-between align-center mb-16">
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                {editingCustomer ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}
+              </h3>
+              <X size={20} style={{ cursor: 'pointer' }} onClick={() => setShowModal(false)} />
             </div>
 
-            <form onSubmit={handleSave}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="form-group">
-                  <label>اسم العميل الثنائي/الثلاثي *</label>
-                  <input 
-                    type="text" 
-                    value={formData.name} 
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                    required 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>رقم هاتف العميل *</label>
-                  <input 
-                    type="text" 
-                    value={formData.phone} 
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
-                    required 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>البريد الإلكتروني (اختياري)</label>
-                  <input 
-                    type="email" 
-                    value={formData.email} 
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>رصيد نقاط الترحيب</label>
-                  <input 
-                    type="number" 
-                    value={formData.points} 
-                    onChange={(e) => setFormData({ ...formData, points: e.target.value })} 
-                  />
-                </div>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group mb-16">
+                <label>اسم العميل بالكامل *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="مثال: أحمد محمود"
+                  required
+                />
               </div>
 
-              <div className="modal-footer">
+              <div className="form-group mb-16">
+                <label>رقم الهاتف</label>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  placeholder="01012345678"
+                />
+              </div>
+
+              <div className="form-group mb-16">
+                <label>البريد الإلكتروني</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="customer@example.com"
+                />
+              </div>
+
+              <div className="flex justify-end gap-12 mt-24">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">حفظ</button>
+                <button type="submit" className="btn btn-primary">حفظ العميل</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Customer Account Statement Modal */}
+      {showStatementModal && selectedStatementCustomer && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.6)',
+          zIndex: 99999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          fontFamily: 'var(--font-ar)'
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '16px',
+            maxWidth: '750px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            padding: '28px',
+            direction: 'rtl'
+          }}>
+            <div className="flex justify-between align-center mb-16" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+              <div>
+                <span className="badge primary mb-4" style={{ fontSize: '11px' }}>كشف حساب عميل مفصل</span>
+                <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{selectedStatementCustomer.name}</h3>
+              </div>
+              <div className="flex gap-8 align-center">
+                <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handleExportStatementCSV}>
+                  <Download size={14} />
+                  <span>تصدير CSV</span>
+                </button>
+                <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={handlePrintStatement}>
+                  <Printer size={14} />
+                  <span>طباعة A4</span>
+                </button>
+                <X size={20} style={{ cursor: 'pointer' }} onClick={() => setShowStatementModal(false)} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'var(--bg-app)', padding: '14px', borderRadius: '10px', marginBottom: '20px', fontSize: '13px' }}>
+              <div><strong>رقم الهاتف:</strong> {selectedStatementCustomer.phone || 'غير مسجل'}</div>
+              <div><strong>البريد الإلكتروني:</strong> {selectedStatementCustomer.email || 'غير مسجل'}</div>
+              <div><strong>نقاط الولاء:</strong> {selectedStatementCustomer.loyaltyPoints || 0} نقطة</div>
+              <div><strong>الرصيد المتبقي المستحق:</strong> <strong style={{ color: (selectedStatementCustomer.balance || 0) > 0 ? 'var(--danger)' : 'var(--success)' }}>{(selectedStatementCustomer.balance || 0).toLocaleString()} ج.م</strong></div>
+            </div>
+
+            <h4 style={{ fontSize: '14.5px', fontWeight: 'bold', marginBottom: '12px' }}>سجل الفواتير والمقبوضات والمرتجعات:</h4>
+            
+            {loadingLedger ? (
+              <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>جاري تحميل كشف الحساب...</div>
+            ) : (
+              <div className="table-container mb-20">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>التاريخ</th>
+                      <th>النوع</th>
+                      <th>البيان والمرجع</th>
+                      <th>المبلغ</th>
+                      <th>الرصيد التراكمي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {statementTransactions.length > 0 ? (
+                      statementTransactions.map((tx, idx) => (
+                        <tr key={idx}>
+                          <td>{new Date(tx.createdAt || tx.date).toLocaleDateString('ar-EG')}</td>
+                          <td><span className="badge info">{tx.type || 'معاملة'}</span></td>
+                          <td>{tx.reference || tx.notes || 'فاتورة آجل'}</td>
+                          <td style={{ fontWeight: 'bold', color: tx.amount < 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            {(tx.amount || 0).toLocaleString()} ج.م
+                          </td>
+                          <td style={{ fontWeight: 'bold' }}>
+                            {(tx.balanceAfter || 0).toLocaleString()} ج.م
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                          لا توجد معاملات مسجلة في كشف حساب العميل حالياً.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

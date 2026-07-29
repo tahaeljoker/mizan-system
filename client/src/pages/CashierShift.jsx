@@ -1,46 +1,112 @@
 import React, { useState } from 'react';
-import { Coins, Calendar, FileText, CheckCircle, ArrowUpDown, Printer, X } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Coins, Calendar, FileText, CheckCircle, Printer, X } from 'lucide-react';
+import apiService from '../services/api';
 
 const CashierShift = () => {
-  const user = JSON.parse(localStorage.getItem('mizan_user')) || { name: 'سارة أحمد' };
+  const queryClient = useQueryClient();
+  const user = JSON.parse(localStorage.getItem('mizan_user')) || { name: 'المستخدم' };
 
   const [showCloseShiftModal, setShowCloseShiftModal] = useState(false);
+  const [showOpenShiftModal, setShowOpenShiftModal] = useState(false);
+  const [openingCashInput, setOpeningCashInput] = useState('');
   const [actualCashDrawer, setActualCashDrawer] = useState('');
+  const [closingNotes, setClosingNotes] = useState('');
 
-  // Load shift details
-  const openingCash = parseFloat(localStorage.getItem('mizan_opening_cash')) || 0;
-  const shiftSales = parseFloat(localStorage.getItem('mizan_shift_sales')) || 0;
-  const isShiftOpen = localStorage.getItem('mizan_shift_open') === 'true';
+  // 1. Fetch current active shift
+  const { data: currentShift, isLoading: loadingCurrentShift } = useQuery({
+    queryKey: ['currentShift'],
+    queryFn: () => apiService.shifts.getCurrent()
+  });
 
-  // Load shift logs (history of closed shifts)
-  const shiftLogs = JSON.parse(localStorage.getItem('mizan_shift_logs')) || [];
+  // 2. Fetch shift history logs
+  const { data: shiftHistoryData } = useQuery({
+    queryKey: ['shiftHistory'],
+    queryFn: () => apiService.shifts.getAll()
+  });
 
-  // Load invoices to filter the ones issued by this cashier
-  const salesHistory = JSON.parse(localStorage.getItem('mizan_sales_history')) || [
-    { id: 'inv-1001', customer: 'أحمد محمود', customerPhone: '01122334455', date: '2026-07-12 01:10', items: [{ name: 'فستان سواريه مطرز', sellPrice: 850, qty: 1 }], subtotal: 850, discount: 0, total: 850, paymentMethod: 'كاش', cashier: 'سارة أحمد' }
-  ];
+  const shiftLogs = shiftHistoryData?.shifts || shiftHistoryData || [];
 
-  // Filter invoices for this cashier
-  const myInvoices = salesHistory.filter(inv => inv.cashier === user.name);
+  // Mutations
+  const openShiftMutation = useMutation({
+    mutationFn: (data) => apiService.shifts.open(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentShift'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftHistory'] });
+      setShowOpenShiftModal(false);
+      alert('تم فتح وردية جديدة بنجاح! 🎉');
+    },
+    onError: (err) => {
+      alert('حدث خطأ أثناء فتح الوردية: ' + (err.response?.data?.message || err.message));
+    }
+  });
+
+  const closeShiftMutation = useMutation({
+    mutationFn: ({ id, data }) => apiService.shifts.close(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentShift'] });
+      queryClient.invalidateQueries({ queryKey: ['shiftHistory'] });
+      setShowCloseShiftModal(false);
+      alert('تم إغلاق الوردية وحفظ تقرير الزيادة والعجز بنجاح! ✅');
+    },
+    onError: (err) => {
+      alert('حدث خطأ في إغلاق الوردية: ' + (err.response?.data?.message || err.message));
+    }
+  });
+
+  const isShiftOpen = !!currentShift;
+  const openingCash = currentShift?.openingCash || 0;
+  const shiftSales = currentShift?.totalSales || 0;
+
+  const handleOpenShiftSubmit = (e) => {
+    e.preventDefault();
+    const amount = parseFloat(openingCashInput) || 0;
+    openShiftMutation.mutate({ openingCash: amount });
+  };
+
+  const handleCloseShiftSubmit = (e) => {
+    e.preventDefault();
+    if (!currentShift) return;
+
+    const actual = parseFloat(actualCashDrawer) || 0;
+    closeShiftMutation.mutate({
+      id: currentShift._id || currentShift.id,
+      data: {
+        actualCash: actual,
+        notes: closingNotes
+      }
+    });
+  };
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', fontFamily: 'var(--font-ar)' }}>
+    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
       <div className="flex justify-between align-center mb-24">
         <div>
           <h1 style={{ fontSize: '28px' }}>خزنة الوردية والعمليات اليومية 💰</h1>
           <p style={{ color: 'var(--text-muted)' }}>مراقبة النقدية المتاحة بالدرج، حركة فواتير الكاشير، وسجل الورديات المقفلة.</p>
         </div>
-        <button 
-          className="btn btn-primary" 
-          onClick={() => setShowCloseShiftModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-        >
-          <Printer size={18} />
-          <span>إنهاء الوردية وطباعة Z-Report</span>
-        </button>
+        {isShiftOpen ? (
+          <button 
+            className="btn btn-primary" 
+            onClick={() => setShowCloseShiftModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Printer size={18} />
+            <span>إغلاق الوردية وطباعة Z-Report</span>
+          </button>
+        ) : (
+          <button 
+            className="btn btn-primary" 
+            onClick={() => setShowOpenShiftModal(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Coins size={18} />
+            <span>فتح وردية كاشير جديدة</span>
+          </button>
+        )}
       </div>
 
-      {/* Shift status card */}
+      {/* Shift Status Cards */}
       <div className="grid-cols-3 mb-24">
         <div className="card stat-card" style={{ borderColor: isShiftOpen ? 'var(--success)' : 'var(--danger)' }}>
           <div className="stat-info">
@@ -49,7 +115,7 @@ const CashierShift = () => {
               {openingCash.toLocaleString()} ج.م
             </span>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              {isShiftOpen ? 'الشيفت الحالي نشط' : 'الشيفت مغلق'}
+              {isShiftOpen ? `وردية رقم: ${currentShift?.shiftNumber || 'نشطة'}` : 'الوردية مغلقة'}
             </span>
           </div>
           <div className="stat-icon success">
@@ -59,11 +125,11 @@ const CashierShift = () => {
 
         <div className="card stat-card">
           <div className="stat-info">
-            <span className="stat-title">مبيعات الوردية (الفعالة)</span>
+            <span className="stat-title">إجمالي مبيعات الوردية</span>
             <span className="stat-value" style={{ color: 'var(--primary)' }}>
               {shiftSales.toLocaleString()} ج.م
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>مجموع مبيعات الكاشير الحالية</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>عدد الفواتير: {currentShift?.totalInvoices || 0}</span>
           </div>
           <div className="stat-icon primary">
             <CheckCircle size={24} />
@@ -74,9 +140,9 @@ const CashierShift = () => {
           <div className="stat-info">
             <span className="stat-title">الرصيد المتوقع بالدرج</span>
             <span className="stat-value" style={{ color: 'var(--success)', fontWeight: 'bold' }}>
-              {(openingCash + shiftSales).toLocaleString()} ج.م
+              {(currentShift?.expectedCash || (openingCash + shiftSales)).toLocaleString()} ج.م
             </span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>مطابق لنقدية العهدة</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>افتتاحي + كاش مبيعات</span>
           </div>
           <div className="stat-icon success">
             <Coins size={24} />
@@ -84,81 +150,51 @@ const CashierShift = () => {
         </div>
       </div>
 
-      {/* My Shift Invoices */}
-      <div className="card mb-24">
-        <h3 style={{ fontSize: '18px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FileText size={20} className="text-primary" />
-          <span>سجل فواتير مبيعاتي بالشيفت الحالي ({myInvoices.length})</span>
-        </h3>
-
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>رقم الفاتورة</th>
-                <th>التاريخ والوقت</th>
-                <th>العميل</th>
-                <th>طريقة الدفع</th>
-                <th>قيمة المبيعات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {myInvoices.map(inv => (
-                <tr key={inv.id}>
-                  <td style={{ fontWeight: 'bold' }}>{inv.id}</td>
-                  <td>{inv.date}</td>
-                  <td>{inv.customer}</td>
-                  <td>{inv.paymentMethod}</td>
-                  <td style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{inv.total.toLocaleString()} ج.م</td>
-                </tr>
-              ))}
-              {myInvoices.length === 0 && (
-                <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                    لم تقم بإصدار أي فواتير مبيعات بالوردية الحالية بعد.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Cashier Shift Closure Logs History */}
+      {/* Shift History Table */}
       <div className="card">
         <h3 style={{ fontSize: '18px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Calendar size={20} className="text-primary" />
-          <span>سجل إغلاق الورديات السابقة للكاشير</span>
+          <span>سجل إغلاق الورديات السابقة</span>
         </h3>
 
         <div className="table-container">
           <table>
             <thead>
               <tr>
-                <th>تاريخ الإغلاق</th>
+                <th>رقم الوردية</th>
                 <th>الكاشير</th>
+                <th>تاريخ الفتح والإغلاق</th>
                 <th>رصيد الافتتاح</th>
-                <th>رصيد المبيعات</th>
-                <th>العجز والزيادة بالخزنة</th>
+                <th>المبيعات والتسويات</th>
+                <th>الفرق (عجز / زيادة)</th>
+                <th>الحالة</th>
               </tr>
             </thead>
             <tbody>
-              {shiftLogs.map(log => (
-                <tr key={log.id}>
-                  <td>{log.date}</td>
-                  <td>{log.cashier}</td>
-                  <td>{log.openingCash} ج.م</td>
-                  <td>{log.salesCash} ج.م</td>
-                  <td style={{ fontWeight: 'bold', color: log.difference === 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {log.difference === 0 ? '✓ متطابق' : log.difference > 0 ? `فائض +${log.difference} ج.م` : `عجز ${log.difference} ج.م`}
-                  </td>
-                </tr>
-              ))}
-              {shiftLogs.length === 0 && (
+              {shiftLogs.length > 0 ? (
+                shiftLogs.map((log) => (
+                  <tr key={log._id || log.id}>
+                    <td style={{ fontWeight: 'bold' }}>{log.shiftNumber || log._id}</td>
+                    <td>{log.userId?.name || user.name}</td>
+                    <td>
+                      <div>{new Date(log.openedAt || log.createdAt).toLocaleDateString('ar-EG')}</div>
+                      {log.closedAt && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>إغلاق: {new Date(log.closedAt).toLocaleTimeString('ar-EG')}</div>}
+                    </td>
+                    <td>{(log.openingCash || 0).toLocaleString()} ج.م</td>
+                    <td>{(log.totalSales || 0).toLocaleString()} ج.م</td>
+                    <td style={{ fontWeight: 'bold', color: (log.difference || 0) < 0 ? 'var(--danger)' : (log.difference || 0) > 0 ? 'var(--warning)' : 'var(--success)' }}>
+                      {(log.difference || 0) > 0 ? `+${log.difference}` : log.difference || 0} ج.م
+                    </td>
+                    <td>
+                      <span className={`badge badge-${log.status === 'OPEN' ? 'warning' : 'success'}`}>
+                        {log.status === 'OPEN' ? 'مفتوحة' : 'مغلقة'}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
-                    لا توجد سجلات تسوية ورديات سابقة مقفلة.
-                  </td>
+                  <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد ورديات مسجلة سابقة</td>
                 </tr>
               )}
             </tbody>
@@ -166,97 +202,74 @@ const CashierShift = () => {
         </div>
       </div>
 
-      {/* Z-Report / Close Shift Modal */}
-      {showCloseShiftModal && (
+      {/* Open Shift Modal */}
+      {showOpenShiftModal && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '400px' }}>
+          <div className="modal-content">
             <div className="modal-header">
-              <h3>تقرير الإقفال (Z-Report)</h3>
-              <X className="modal-close" onClick={() => setShowCloseShiftModal(false)} />
+              <h3>فتح وردية كاشير جديدة 🚀</h3>
+              <button className="close-btn" onClick={() => setShowOpenShiftModal(false)}><X size={20} /></button>
             </div>
-
-            <div style={{ background: '#fff', color: '#000', padding: '20px', borderRadius: '8px', border: '1px dashed #ccc', fontFamily: 'monospace', margin: '16px 0', fontSize: '13px' }}>
-              <div style={{ textAlign: 'center', borderBottom: '1px dashed #ccc', paddingBottom: '10px', marginBottom: '10px' }}>
-                <h2 style={{ margin: 0, fontSize: '18px' }}>{localStorage.getItem('mizan_shop_name') || 'مِيزان للبيع والتوزيع'}</h2>
-                <p style={{ margin: '4px 0' }}>تقرير نهاية الوردية Z-Report</p>
-                <p style={{ margin: '4px 0' }}>الكاشير: {user.name}</p>
-                <p style={{ margin: '4px 0' }}>التاريخ: {new Date().toLocaleDateString('ar-EG')} - {new Date().toLocaleTimeString('ar-EG')}</p>
+            <form onSubmit={handleOpenShiftSubmit}>
+              <div className="form-group mb-16">
+                <label className="form-label">العهدية / رصيد بداية الوردية بالنقدية (ج.م) *</label>
+                <input 
+                  type="number" 
+                  className="form-control"
+                  value={openingCashInput}
+                  onChange={(e) => setOpeningCashInput(e.target.value)}
+                  placeholder="مثال: 500"
+                  required
+                />
               </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span>رصيد الدرج الافتتاحي:</span>
-                <span>{openingCash.toLocaleString()} ج.م</span>
+              <div className="flex gap-12 justify-end">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowOpenShiftModal(false)}>إلغاء</button>
+                <button type="submit" className="btn btn-primary">تأكيد وفتح الوردية</button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span>مبيعات الوردية:</span>
-                <span>{shiftSales.toLocaleString()} ج.م</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span>عدد الفواتير المصدرة:</span>
-                <span>{myInvoices.length} فاتورة</span>
-              </div>
-
-              <div style={{ borderTop: '1px dashed #ccc', paddingTop: '10px', marginTop: '10px', display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '15px' }}>
-                <span>إجمالي النقدية المتوقعة بالدرج:</span>
-                <span>{(openingCash + shiftSales).toLocaleString()} ج.م</span>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>النقدية الفعلية الموجودة بالدرج (للمطابقة)</label>
-              <input 
-                type="number" 
-                value={actualCashDrawer} 
-                onChange={(e) => setActualCashDrawer(e.target.value)} 
-                placeholder="أدخل المبلغ الفعلي الذي قمت بعدّه..." 
-              />
-            </div>
-
-            <div className="modal-footer" style={{ marginTop: '20px' }}>
-              <button className="btn btn-secondary" onClick={() => setShowCloseShiftModal(false)}>إلغاء</button>
-              <button 
-                className="btn btn-primary" 
-                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-                onClick={() => {
-                  if (!actualCashDrawer) {
-                    alert('الرجاء إدخال النقدية الفعلية للمطابقة!');
-                    return;
-                  }
-                  const actual = parseFloat(actualCashDrawer) || 0;
-                  const expected = openingCash + shiftSales;
-                  const diff = actual - expected;
-
-                  const log = {
-                    id: 'shift-' + Date.now(),
-                    date: new Date().toLocaleString('ar-EG'),
-                    cashier: user.name,
-                    openingCash,
-                    salesCash: shiftSales,
-                    actualCash: actual,
-                    difference: diff
-                  };
-
-                  const updatedLogs = [log, ...shiftLogs];
-                  localStorage.setItem('mizan_shift_logs', JSON.stringify(updatedLogs));
-                  
-                  // Reset shift
-                  localStorage.setItem('mizan_shift_open', 'false');
-                  localStorage.setItem('mizan_shift_sales', '0');
-                  
-                  window.print(); // Print the Z-Report
-
-                  alert('تم إغلاق الوردية وحفظ التقرير بنجاح!');
-                  window.location.reload();
-                }}
-              >
-                <Printer size={16} />
-                تأكيد وطباعة Z-Report
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
 
+      {/* Close Shift Modal */}
+      {showCloseShiftModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>إغلاق الوردية وجرد النقدية بالدرج 🏁</h3>
+              <button className="close-btn" onClick={() => setShowCloseShiftModal(false)}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleCloseShiftSubmit}>
+              <div className="p-12 mb-16" style={{ background: 'var(--bg-app)', borderRadius: '8px' }}>
+                <p><strong>الرصيد المتوقع بالدرج:</strong> {(currentShift?.expectedCash || (openingCash + shiftSales)).toLocaleString()} ج.م</p>
+              </div>
+              <div className="form-group mb-16">
+                <label className="form-label">النقدية الفعلية الموجودة بالدرج الآن (ج.م) *</label>
+                <input 
+                  type="number" 
+                  className="form-control"
+                  value={actualCashDrawer}
+                  onChange={(e) => setActualCashDrawer(e.target.value)}
+                  placeholder="أدخل المبلغ بعد العد اليدوي"
+                  required
+                />
+              </div>
+              <div className="form-group mb-16">
+                <label className="form-label">ملاحظات الإغلاق (اختياري)</label>
+                <textarea 
+                  className="form-control"
+                  value={closingNotes}
+                  onChange={(e) => setClosingNotes(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-12 justify-end">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCloseShiftModal(false)}>إلغاء</button>
+                <button type="submit" className="btn btn-primary" style={{ background: 'var(--danger)' }}>تأكيد إغلاق الوردية</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

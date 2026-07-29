@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mizan_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: mizan
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: mizan_backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGO_URI: mongodb://mongodb:27017/mizan
+      JWT_SECRET: mizan_pos_super_secret_jwt_key_2026
+    depends_on:
+      - mongodb
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: mizan_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:

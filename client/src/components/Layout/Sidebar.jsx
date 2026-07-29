@@ -17,6 +17,7 @@ import {
   ChevronUp,
   LogOut,
   Tag,
+  BookOpen,
   X
 } from 'lucide-react';
 
@@ -141,8 +142,20 @@ const Sidebar = ({ isOpen, toggleSidebar, onLogout }) => {
           { path: '/products', name: 'الأصناف والمنتجات' },
           storedFeatures.inventory && { path: '/inventory', name: 'حركة المخزن وجلسات الجرد' },
           storedFeatures.inventory && { path: '/transfer-logs', name: 'التحويلات بين الفروع' },
+          storedFeatures.purchases && { path: '/purchase-orders', name: 'أوامر الشراء والتوريد' },
           storedFeatures.suppliers && { path: '/suppliers', name: 'الموردين وفواتير الشراء' }
         ].filter(Boolean)
+      },
+      (user?.role === 'owner' || user?.role === 'admin' || user?.role === 'accountant' || user?.role === 'manager') && {
+        id: 'accounting_group',
+        name: 'المحاسبة والقيود اليومية',
+        icon: BookOpen,
+        items: [
+          { path: '/accounting/journal-entries', name: 'دفتر القيود اليومية' },
+          { path: '/accounting/ledger', name: 'الأستاذ العام (General Ledger)' },
+          { path: '/accounting/trial-balance', name: 'ميزان المراجعة (Trial Balance)' },
+          { path: '/accounting/chart-of-accounts', name: 'شجرة الحسابات' }
+        ]
       },
       {
         id: 'hr',

@@ -1,23 +1,44 @@
 import React, { useState } from 'react';
-import { Search, Bell, Menu, Sparkles, X, AlertCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Search, Bell, Menu, Sparkles, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import apiService from '../../services/api';
 
 const Header = ({ toggleSidebar }) => {
+  const queryClient = useQueryClient();
   const [showNotifications, setShowNotifications] = useState(false);
-  const isShiftOpen = localStorage.getItem('mizan_shift_open') === 'true';
 
-  // Load notifications from local storage log
-  const notifications = JSON.parse(localStorage.getItem('mizan_notifications_log')) || [
-    { text: 'مرحباً بك في منصة ميزان! تم تفعيل حسابك بنجاح ونقله إلى خوادم السحابة الفعالة.', type: 'success', date: '2026-07-12 01:10' }
-  ];
+  // Unread Count Query with 15s polling
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['unreadNotificationCount'],
+    queryFn: () => apiService.workflow.getUnreadCount(),
+    refetchInterval: 15000
+  });
 
-  // For unread badge indicator - clear unread dot when popover is opened
-  const [hasUnread, setHasUnread] = useState(true);
+  // Notifications List Query
+  const { data: notificationsData } = useQuery({
+    queryKey: ['notificationsList'],
+    queryFn: () => apiService.workflow.getNotifications({ limit: 10 })
+  });
+
+  const notifications = notificationsData?.data || notificationsData || [];
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => apiService.workflow.markAllRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unreadNotificationCount'] });
+      queryClient.invalidateQueries({ queryKey: ['notificationsList'] });
+    }
+  });
 
   const handleOpenNotifications = () => {
     setShowNotifications(!showNotifications);
-    setHasUnread(false);
+    if (!showNotifications && unreadCount > 0) {
+      markAllReadMutation.mutate();
+    }
   };
+
+  const isShiftOpen = localStorage.getItem('mizan_shift_open') === 'true';
 
   return (
     <header className="header" style={{ position: 'relative' }}>
@@ -27,7 +48,7 @@ const Header = ({ toggleSidebar }) => {
         </button>
         <div className="header-search">
           <Search size={18} />
-          <input type="text" placeholder="البحث السريع..." />
+          <input type="text" placeholder="البحث السريع في ميزان..." />
         </div>
       </div>
 
@@ -35,7 +56,7 @@ const Header = ({ toggleSidebar }) => {
         {/* Trial Warning Badge */}
         <Link to="/billing" className="badge warning trial-warning-badge" style={{ cursor: 'pointer', padding: '8px 12px', display: 'flex', gap: '6px', alignItems: 'center' }}>
           <Sparkles size={14} />
-          <span className="trial-text">ينتهي التجريب بعد 14 يوم - جدد الآن</span>
+          <span className="trial-text">النظام مفعّل بالسحابة السريعة</span>
         </Link>
 
         {/* Notifications Bell with Popover */}
@@ -46,17 +67,26 @@ const Header = ({ toggleSidebar }) => {
             style={{ cursor: 'pointer', position: 'relative' }}
           >
             <Bell size={20} />
-            {hasUnread && (
+            {unreadCount > 0 && (
               <span style={{
                 position: 'absolute',
                 top: '4px',
                 right: '4px',
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
+                minWidth: '16px',
+                height: '16px',
+                padding: '0 4px',
+                borderRadius: '8px',
                 background: 'var(--danger)',
+                color: '#fff',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 boxShadow: '0 0 4px var(--danger)'
-              }}></span>
+              }}>
+                {unreadCount}
+              </span>
             )}
           </div>
 
@@ -84,20 +114,22 @@ const Header = ({ toggleSidebar }) => {
                 <X size={16} style={{ cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setShowNotifications(false)} />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '240px', overflowY: 'auto' }}>
-                {notifications.map((n, idx) => (
-                  <div key={idx} style={{
-                    padding: '10px 12px',
-                    background: 'var(--bg-main)',
-                    borderRadius: '6px',
-                    borderRight: `4px solid ${n.type === 'success' ? '#10b981' : n.type === 'warning' ? '#f59e0b' : '#3b82f6'}`,
-                    fontSize: '12px'
-                  }}>
-                    <p style={{ margin: '0 0 6px 0', color: 'var(--text-main)', lineHeight: '1.5' }}>{n.text}</p>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>التاريخ: {n.date}</span>
-                  </div>
-                ))}
-                {notifications.length === 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '260px', overflowY: 'auto' }}>
+                {notifications.length > 0 ? (
+                  notifications.map((n) => (
+                    <div key={n._id || n.id} style={{
+                      padding: '10px 12px',
+                      background: 'var(--bg-main)',
+                      borderRadius: '6px',
+                      borderRight: `4px solid ${n.type === 'SUCCESS' ? '#10b981' : n.type === 'WARNING' || n.type === 'ERROR' ? '#ef4444' : '#3b82f6'}`,
+                      fontSize: '12px'
+                    }}>
+                      <div style={{ fontWeight: 'bold', color: 'var(--text-main)', marginBottom: '4px' }}>{n.title}</div>
+                      <p style={{ margin: '0 0 6px 0', color: 'var(--text-muted)', lineHeight: '1.4' }}>{n.message}</p>
+                      <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{new Date(n.createdAt).toLocaleTimeString('ar-EG')}</span>
+                    </div>
+                  ))
+                ) : (
                   <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>
                     لا توجد إشعارات نشطة حالياً.
                   </div>
