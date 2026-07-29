@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000/api/v1`;
+// API Base URL configuration:
+// 1. Primary: import.meta.env.VITE_API_URL (set via Vercel / environment)
+// 2. Dev mode fallback: http://localhost:5000/api/v1 (during npm run dev)
+// 3. Production fallback: https://mizan-system-production.up.railway.app/api/v1 (on Vercel deployment)
+const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000/api/v1' : 'https://mizan-system-production.up.railway.app/api/v1');
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -26,57 +30,77 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('mizan_token');
-      localStorage.removeItem('mizan_user');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      // Don't auto-redirect on login or auth checks
+      const isAuthEndpoint = error.config && (
+        error.config.url.includes('/auth/login') || 
+        error.config.url.includes('/auth/me')
+      );
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('mizan_token');
+        localStorage.removeItem('mizan_user');
       }
     }
     return Promise.reject(error);
   }
 );
 
-export const apiService = {
-  // 1. Authentication
+const apiService = {
+  // 1. Auth & Session
   auth: {
     login: async (email, password) => {
       const response = await api.post('/auth/login', { email, password });
-      if (response.data.success && response.data.token) {
+      if (response.data.token) {
         localStorage.setItem('mizan_token', response.data.token);
         localStorage.setItem('mizan_user', JSON.stringify(response.data.user));
       }
       return response.data;
     },
-    register: async (shopData) => {
-      const response = await api.post('/auth/register', shopData);
-      if (response.data.success && response.data.token) {
-        localStorage.setItem('mizan_token', response.data.token);
-        localStorage.setItem('mizan_user', JSON.stringify(response.data.user));
-      }
+    register: async (userData) => {
+      const response = await api.post('/auth/register', userData);
       return response.data;
     },
-    me: async () => {
+    logout: async () => {
+      try {
+        await api.post('/auth/logout');
+      } catch (e) {
+        console.warn('Logout endpoint failed:', e.message);
+      } finally {
+        localStorage.removeItem('mizan_token');
+        localStorage.removeItem('mizan_user');
+      }
+    },
+    getMe: async () => {
       const response = await api.get('/auth/me');
-      return response.data;
+      return response.data.user;
     },
-    logout: () => {
-      localStorage.removeItem('mizan_token');
-      localStorage.removeItem('mizan_user');
-      window.location.href = '/login';
+    refreshToken: async () => {
+      const response = await api.post('/auth/refresh');
+      if (response.data.token) {
+        localStorage.setItem('mizan_token', response.data.token);
+      }
+      return response.data;
     }
   },
 
-  // 2. Demo Sandbox
-  demo: {
-    getAccounts: async () => {
-      const response = await api.get('/demo/accounts');
-      return response.data.accounts || [];
-    },
-    getStatus: async () => {
-      const response = await api.get('/demo/status');
+  // 2. SaaS & Organizations
+  saas: {
+    registerCompany: async (companyData) => {
+      const response = await api.post('/saas/register', companyData);
       return response.data;
     },
-    reset: async () => {
+    getSubscription: async () => {
+      const response = await api.get('/saas/subscription');
+      return response.data.subscription;
+    },
+    upgradePlan: async (planCode, billingCycle) => {
+      const response = await api.post('/saas/upgrade', { planCode, billingCycle });
+      return response.data;
+    },
+    getWhiteLabel: async () => {
+      const response = await api.get('/saas/whitelabel');
+      return response.data.config;
+    },
+    resetDemoData: async () => {
       const response = await api.post('/demo/reset');
       return response.data;
     },
@@ -532,113 +556,25 @@ export const apiService = {
       const response = await api.delete(`/notifications/${id}`);
       return response.data;
     },
-    getApprovals: async (params) => {
+    getApprovalRequests: async (params) => {
       const response = await api.get('/approvals', { params });
       return response.data;
     },
-    getPendingApprovals: async (params) => {
-      const response = await api.get('/approvals/pending', { params });
-      return response.data;
-    },
-    createApproval: async (data) => {
-      const response = await api.post('/approvals', data);
+    approveRequest: async (id, comment) => {
+      const response = await api.post(`/approvals/${id}/approve`, { comment });
       return response.data.request;
     },
-    approveRequest: async (id, comments) => {
-      const response = await api.post(`/approvals/${id}/approve`, { comments });
+    rejectRequest: async (id, reason) => {
+      const response = await api.post(`/approvals/${id}/reject`, { reason });
       return response.data.request;
     },
-    rejectRequest: async (id, comments) => {
-      const response = await api.post(`/approvals/${id}/reject`, { comments });
-      return response.data.request;
-    },
-    cancelApproval: async (id) => {
-      const response = await api.post(`/approvals/${id}/cancel`);
-      return response.data.request;
-    },
-    getAuditTrail: async (params) => {
-      const response = await api.get('/audit', { params });
+    getAuditLogs: async (params) => {
+      const response = await api.get('/audit-logs', { params });
       return response.data;
     },
-    getAuditById: async (id) => {
-      const response = await api.get(`/audit/${id}`);
-      return response.data.audit;
-    },
-    getJobsList: async () => {
-      const response = await api.get('/jobs');
-      return response.data.jobs || [];
-    },
-    runJob: async (jobName) => {
-      const response = await api.post(`/jobs/run/${jobName}`);
-      return response.data.jobLog;
-    },
-    getJobHistory: async () => {
-      const response = await api.get('/jobs/history');
-      return response.data.history || [];
-    }
-  },
-
-  // 13. SaaS Platform Client Endpoints
-  saas: {
-    registerCompany: async (companyData) => {
-      const response = await api.post('/saas/register', companyData);
+    getJobLogs: async (params) => {
+      const response = await api.get('/job-logs', { params });
       return response.data;
-    },
-    getPlans: async () => {
-      const response = await api.get('/saas/plans');
-      return response.data.plans || [];
-    },
-    getTickets: async (params) => {
-      const response = await api.get('/saas/tickets', { params });
-      return response.data;
-    },
-    createTicket: async (data) => {
-      const response = await api.post('/saas/tickets', data);
-      return response.data.ticket;
-    },
-    replyTicket: async (id, message) => {
-      const response = await api.post(`/saas/tickets/${id}/reply`, { message });
-      return response.data.ticket;
-    },
-    getWhiteLabel: async () => {
-      const response = await api.get('/saas/white-label');
-      return response.data.config;
-    },
-    updateWhiteLabel: async (data) => {
-      const response = await api.post('/saas/white-label', data);
-      return response.data.config;
-    }
-  },
-
-  // 14. Super Admin Client Endpoints
-  super: {
-    getDashboard: async () => {
-      const response = await api.get('/super/dashboard');
-      return response.data.dashboard;
-    },
-    getCompanies: async (params) => {
-      const response = await api.get('/super/companies', { params });
-      return response.data;
-    },
-    updateCompanyStatus: async (id, status) => {
-      const response = await api.patch(`/super/companies/${id}/status`, { status });
-      return response.data.company;
-    },
-    deleteCompany: async (id) => {
-      const response = await api.delete(`/super/companies/${id}`);
-      return response.data;
-    },
-    impersonateCompany: async (id) => {
-      const response = await api.post(`/super/companies/${id}/impersonate`);
-      return response.data.ownerUser;
-    },
-    getBackups: async () => {
-      const response = await api.get('/super/backups');
-      return response.data.backups || [];
-    },
-    triggerBackup: async () => {
-      const response = await api.post('/super/backups');
-      return response.data.backup;
     }
   }
 };
