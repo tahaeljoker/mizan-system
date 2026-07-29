@@ -36,11 +36,12 @@ import {
   Lock,
   Smartphone,
   CheckCircle,
-  Building
+  Building,
+  LayoutDashboard
 } from 'lucide-react';
 import PricingCalculator from '../components/PricingCalculator';
 
-const Landing = () => {
+const Landing = ({ user }) => {
   const navigate = useNavigate();
 
   const [isYearly, setIsYearly] = useState(false);
@@ -179,14 +180,26 @@ const Landing = () => {
         </nav>
 
         <div className="flex align-center gap-12">
-          <Link to="/advisor" className="btn btn-secondary" style={{ padding: '9px 18px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <Bot size={16} className="text-primary" />
-            <span>مستشار مدار الذكي</span>
-          </Link>
-          <Link to="/advisor" className="btn btn-primary" style={{ padding: '9px 22px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <Sparkles size={16} />
-            <span>ابدأ تجربتك المجانية (14 يوم)</span>
-          </Link>
+          {user ? (
+            <Link to={user.role === 'admin' || user.role === 'SUPER_ADMIN' ? '/admin' : '/dashboard'} className="btn btn-primary" style={{ padding: '9px 22px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <LayoutDashboard size={16} />
+              <span>الانتقال إلى لوحة التحكم</span>
+            </Link>
+          ) : (
+            <>
+              <Link to="/login" className="btn btn-secondary" style={{ padding: '9px 16px', fontSize: '13.5px', background: '#fff' }}>
+                تسجيل الدخول
+              </Link>
+              <Link to="/advisor" className="btn btn-secondary" style={{ padding: '9px 16px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <Bot size={16} className="text-primary" />
+                <span>المستشار الذكي</span>
+              </Link>
+              <Link to="/register" className="btn btn-primary" style={{ padding: '9px 20px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <Sparkles size={16} />
+                <span>ابدأ الآن (14 يوم مجاناً)</span>
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
