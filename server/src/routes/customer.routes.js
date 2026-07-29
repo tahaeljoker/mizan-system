@@ -10,6 +10,7 @@ router.use(authenticate);
 router.get('/', authorizeRoles('owner', 'admin', 'manager', 'accountant', 'warehouse', 'cashier', 'staff'), customerController.getCustomers);
 router.get('/:id', authorizeRoles('owner', 'admin', 'manager', 'accountant', 'warehouse', 'cashier', 'staff'), customerController.getCustomerById);
 router.get('/:id/statement', authorizeRoles('owner', 'admin', 'manager', 'accountant', 'cashier', 'staff'), customerController.getStatement);
+router.get('/:id/ledger', authorizeRoles('owner', 'admin', 'manager', 'accountant', 'cashier', 'staff'), customerController.getStatement);
 
 // Write Endpoints
 router.post('/', authorizeRoles('owner', 'admin', 'manager', 'accountant', 'cashier'), customerController.createCustomer);
