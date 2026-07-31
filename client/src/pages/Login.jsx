@@ -106,7 +106,7 @@ const Login = ({ onLoginSuccess }) => {
             <ShoppingBag size={30} />
           </div>
 
-          <h1 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '6px' }}>مدار ERP/POS</h1>
+          <h1 style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '6px' }}>Orbion ERP/POS</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginBottom: '24px' }}>منصة الكاشير الذكية وإدارة الشركات والمحلات السحابية</p>
 
           {error && (

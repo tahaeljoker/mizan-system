@@ -185,8 +185,8 @@ const Sidebar = ({ isOpen, toggleSidebar, onLogout }) => {
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-brand" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="sidebar-logo">M</div>
-          <div className="sidebar-title">مَدار ERP</div>
+          <div className="sidebar-logo">O</div>
+          <div className="sidebar-title">ORBION ERP</div>
         </div>
         <button 
           onClick={toggleSidebar}

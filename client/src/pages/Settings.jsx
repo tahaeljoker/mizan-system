@@ -3,7 +3,7 @@ import { Settings as SettingsIcon, Save, Store, Receipt, ShieldAlert, Sparkles, 
 
 const Settings = () => {
   const [shopSettings, setShopSettings] = useState({
-    name: 'مدار ERP للبيع والتوزيع',
+    name: 'Orbion ERP للبيع والتوزيع',
     slogan: 'إدارة نشاطك بذكاء من مكان واحد',
     phone: '01098765432',
     address: 'الفرع الرئيسي - المهندسين',
@@ -12,7 +12,7 @@ const Settings = () => {
   });
 
   const [receiptSettings, setReceiptSettings] = useState({
-    headerText: 'مرحبا بكم في مدار ERP',
+    headerText: 'مرحبا بكم في Orbion ERP',
     footerText: 'شكراً لزيارتكم! المرتجع خلال 14 يوماً بالإيصال.',
     showLogo: true,
     showTaxId: false,

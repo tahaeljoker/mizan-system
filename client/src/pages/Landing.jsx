@@ -168,7 +168,7 @@ const Landing = ({ user }) => {
           }}>
             <ShoppingBag size={24} />
           </div>
-          <span style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-main)' }}>مِدار ERP Cloud</span>
+          <span style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-main)' }}>Orbion ERP Cloud</span>
         </div>
 
         <nav className="flex align-center gap-24" style={{ fontSize: '14.5px', fontWeight: '600' }}>
