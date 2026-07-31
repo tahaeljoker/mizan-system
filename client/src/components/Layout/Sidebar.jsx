@@ -172,7 +172,7 @@ const Sidebar = ({ isOpen, toggleSidebar, onLogout }) => {
         icon: BarChart3,
         items: [
           storedFeatures.reports && { path: '/reports', name: 'التقارير والإحصائيات' },
-          user?.role === 'owner' && { path: '/billing', name: 'اشتراك ميزان والفواتير' },
+          user?.role === 'owner' && { path: '/billing', name: 'اشتراك مدار ERP والفواتير' },
           { path: '/settings', name: 'إعدادات الفرع والحساب' }
         ].filter(Boolean)
       }
@@ -186,7 +186,7 @@ const Sidebar = ({ isOpen, toggleSidebar, onLogout }) => {
       <div className="sidebar-brand" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div className="sidebar-logo">M</div>
-          <div className="sidebar-title">مِيزان</div>
+          <div className="sidebar-title">مَدار ERP</div>
         </div>
         <button 
           onClick={toggleSidebar}

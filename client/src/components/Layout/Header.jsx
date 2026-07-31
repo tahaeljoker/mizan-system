@@ -48,7 +48,7 @@ const Header = ({ toggleSidebar }) => {
         </button>
         <div className="header-search">
           <Search size={18} />
-          <input type="text" placeholder="البحث السريع في ميزان..." />
+          <input type="text" placeholder="البحث السريع في مدار ERP..." />
         </div>
       </div>
 

@@ -3,8 +3,8 @@ import { Settings as SettingsIcon, Save, Store, Receipt, ShieldAlert, Sparkles, 
 
 const Settings = () => {
   const [shopSettings, setShopSettings] = useState({
-    name: 'مِيزان للبيع والتوزيع',
-    slogan: 'ملابسك الأنيقة هنا',
+    name: 'مدار ERP للبيع والتوزيع',
+    slogan: 'إدارة نشاطك بذكاء من مكان واحد',
     phone: '01098765432',
     address: 'الفرع الرئيسي - المهندسين',
     currency: 'ج.م',
@@ -12,7 +12,7 @@ const Settings = () => {
   });
 
   const [receiptSettings, setReceiptSettings] = useState({
-    headerText: 'مرحبا بكم في ميزان',
+    headerText: 'مرحبا بكم في مدار ERP',
     footerText: 'شكراً لزيارتكم! المرتجع خلال 14 يوماً بالإيصال.',
     showLogo: true,
     showTaxId: false,
