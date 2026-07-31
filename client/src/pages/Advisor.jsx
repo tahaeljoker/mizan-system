@@ -20,7 +20,7 @@ import apiService from '../services/api';
 const QUESTIONS = [
   {
     id: 'businessType',
-    question: 'مرحباً بك! أنا مستشار مدار الذكي. يسعدني مساعدتك في اختيار الباقة والحل السحابي الأنسب لنشاطك التجارى. بدايةً، ما هو نوع نشاطك؟',
+    question: 'مرحباً بك! أنا مستشار Orbion الذكي. يسعدني مساعدتك في اختيار الباقة والحل السحابي الأنسب لنشاطك التجارى. بدايةً، ما هو نوع نشاطك؟',
     options: ['مطعم / كافيه', 'سوبرماركت / بقالة', 'محل ملابس وأحذية', 'إلكترونيات وأجهزة', 'مخزن / تجارة جملة', 'مصنع / ورشة', 'شركة / خدمات', 'صيدلية', 'عيادة', 'نشاط آخر']
   },
   {
@@ -241,12 +241,12 @@ const Advisor = () => {
             }}>
               <ShoppingBag size={20} />
             </div>
-            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>مِدار Cloud</span>
+            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>Orbion Cloud</span>
           </Link>
           <span style={{ color: 'var(--border)' }}>|</span>
           <span style={{ fontSize: '14px', color: 'var(--primary)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Sparkles size={16} />
-            <span>مستشار مدار الذكي (Madar Advisor)</span>
+            <span>مستشار Orbion الذكي (Orbion Advisor)</span>
           </span>
         </div>
 

@@ -172,7 +172,7 @@ const Landing = ({ user }) => {
         </div>
 
         <nav className="flex align-center gap-24" style={{ fontSize: '14.5px', fontWeight: '600' }}>
-          <a href="#why-madar" style={{ color: 'var(--text-main)', textDecoration: 'none' }}>لماذا مدار؟</a>
+          <a href="#why-orbion" style={{ color: 'var(--text-main)', textDecoration: 'none' }}>لماذا Orbion؟</a>
           <a href="#features" style={{ color: 'var(--text-main)', textDecoration: 'none' }}>الموديولات</a>
           <a href="#pricing" style={{ color: 'var(--text-main)', textDecoration: 'none' }}>الأسعار والباقات</a>
           <a href="#calculator" style={{ color: 'var(--text-main)', textDecoration: 'none' }}>حاسبة التكلفة</a>
@@ -231,11 +231,11 @@ const Landing = ({ user }) => {
             border: '1px solid rgba(79, 70, 229, 0.2)'
           }}>
             <Flame size={18} style={{ color: 'var(--primary)' }} />
-            <span>أكثر من 500 شركة ونشاط تجاري يثقون في منصة مدار Cloud</span>
+            <span>أكثر من 500 شركة ونشاط تجاري يثقون في منصة Orbion Cloud</span>
           </div>
 
           <h1 style={{ fontSize: '48px', fontWeight: '900', lineHeight: '1.25', color: '#0f172a', marginBottom: '24px' }}>
-            مدار ERP Cloud <br />
+            Orbion ERP Cloud <br />
             <span style={{ color: 'var(--primary)', background: 'linear-gradient(135deg, var(--primary), var(--secondary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               إدارة متكاملة لنشاطك التجاري من مكان واحد
             </span>
@@ -254,7 +254,7 @@ const Landing = ({ user }) => {
             </motion.div>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link to="/advisor" className="btn btn-secondary" style={{ padding: '16px 32px', fontSize: '17px', borderRadius: '12px', background: '#fff' }}>
-                تحدث مع مستشار مدار
+                تحدث مع مستشار Orbion
               </Link>
             </motion.div>
           </div>
@@ -285,7 +285,7 @@ const Landing = ({ user }) => {
                 <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }}></span>
                 <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#f59e0b' }}></span>
                 <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }}></span>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px', fontWeight: 'bold' }}>madar.app/dashboard</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)', marginRight: '12px', fontWeight: 'bold' }}>orbion.app/dashboard</span>
               </div>
               <span className="badge success">مباشر ومحدث الآن</span>
             </div>
@@ -379,10 +379,10 @@ const Landing = ({ user }) => {
         </div>
       </section>
 
-      {/* Why Madar? (لماذا مدار؟) */}
-      <section id="why-madar" style={{ padding: '80px 20px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Why Orbion? (لماذا أوربيون؟) */}
+      <section id="why-orbion" style={{ padding: '80px 20px', maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-          <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '14px' }}>لماذا يختار التجار والشركات منصة مدار Cloud؟</h2>
+          <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '14px' }}>لماذا يختار التجار والشركات منصة Orbion Cloud؟</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '16px' }}>تصميم وتكنولوجيا سحابية فائقة تميز عملك وتضمن استقرار تجارتك</p>
         </div>
 
@@ -696,7 +696,7 @@ const Landing = ({ user }) => {
               </div>
               <div className="flex align-center gap-12">
                 <Mail size={20} className="text-primary" />
-                <span>البريد الإلكتروني: support@madar.app</span>
+                <span>البريد الإلكتروني: support@orbion.app</span>
               </div>
               <div className="flex align-center gap-12">
                 <MapPin size={20} className="text-primary" />
@@ -704,7 +704,7 @@ const Landing = ({ user }) => {
               </div>
               <div className="flex align-center gap-12">
                 <Globe size={20} className="text-primary" />
-                <span>الموقع الرسمي: www.madar.app</span>
+                <span>الموقع الرسمي: www.orbion.app</span>
               </div>
             </div>
           </div>
@@ -748,7 +748,7 @@ const Landing = ({ user }) => {
       }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '38px', fontWeight: '900', marginBottom: '18px', color: '#ffffff' }}>
-            ابدأ إدارة مشروعك باحتراف مع منصة مدار
+            ابدأ إدارة مشروعك باحتراف مع منصة Orbion
           </h2>
           <p style={{ fontSize: '18px', opacity: 0.9, lineHeight: '1.6', marginBottom: '36px' }}>
             انضم إلى مئات الشركات والأنشطة التجارية واجعل إدارة عملك أسهل وأسرع من اليوم!
@@ -767,7 +767,7 @@ const Landing = ({ user }) => {
           <div>
             <div className="flex align-center gap-10 mb-16">
               <ShoppingBag size={24} style={{ color: 'var(--primary)' }} />
-              <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#ffffff' }}>مِدار ERP Cloud</span>
+              <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#ffffff' }}>Orbion ERP Cloud</span>
             </div>
             <p style={{ lineHeight: '1.6', color: '#64748b' }}>منصة سحابية متكاملة لإدارة الأنشطة التجارية والمحلات ونقاط البيع بأحدث التكنولوجيات السحابية.</p>
           </div>
@@ -775,7 +775,7 @@ const Landing = ({ user }) => {
           <div>
             <h4 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 'bold', marginBottom: '16px' }}>روابط سريعة</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <li><a href="#why-madar" style={{ color: '#94a3b8', textDecoration: 'none' }}>لماذا منصة مدار؟</a></li>
+              <li><a href="#why-orbion" style={{ color: '#94a3b8', textDecoration: 'none' }}>لماذا منصة Orbion؟</a></li>
               <li><a href="#features" style={{ color: '#94a3b8', textDecoration: 'none' }}>المزايا والموديولات</a></li>
               <li><a href="#pricing" style={{ color: '#94a3b8', textDecoration: 'none' }}>الباقات والأسعار</a></li>
               <li><a href="#faq" style={{ color: '#94a3b8', textDecoration: 'none' }}>الأسئلة الشائعة</a></li>
@@ -793,7 +793,7 @@ const Landing = ({ user }) => {
         </div>
 
         <div style={{ borderTop: '1px solid #1e293b', paddingTop: '24px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
-          جميع الحقوق محفوظة © 2026 منصة مدار ERP Cloud السحابية.
+          جميع الحقوق محفوظة © 2026 منصة Orbion ERP Cloud السحابية.
         </div>
       </footer>
     </div>
