@@ -87,7 +87,11 @@ const POS = () => {
     const fetchProducts = async () => {
       try {
         const data = await apiService.products.getAll();
-        setProductsList(data);
+        const rawList = data?.data || data?.products || data;
+        const safeList = Array.isArray(rawList) ? rawList : (Array.isArray(data) ? data : []);
+        if (safeList.length > 0) {
+          setProductsList(safeList);
+        }
       } catch (err) {
         console.warn('Failed to load products from API, loading local backup:', err.message);
       }
@@ -95,9 +99,13 @@ const POS = () => {
     fetchProducts();
   }, []);
 
-  // Filter products by search query
+  // Filter products by search query with defensive Array.isArray safety
+  const safeProductsList = Array.isArray(productsList) ? productsList : [];
   const searchResults = searchQuery
-    ? productsList.filter(p => p.name.includes(searchQuery) || p.barcode.includes(searchQuery))
+    ? safeProductsList.filter(p => 
+        (p?.name && String(p.name).toLowerCase().includes(searchQuery.toLowerCase())) || 
+        (p?.barcode && String(p.barcode).includes(searchQuery))
+      )
     : [];
 
   const handleApplyCoupon = (e) => {
@@ -264,7 +272,11 @@ const POS = () => {
       
       // Refresh products from server to keep stock in sync
       const updatedProds = await apiService.products.getAll();
-      setProductsList(updatedProds);
+      const rawProds = updatedProds?.data || updatedProds?.products || updatedProds;
+      const safeProds = Array.isArray(rawProds) ? rawProds : (Array.isArray(updatedProds) ? updatedProds : []);
+      if (safeProds.length > 0) {
+        setProductsList(safeProds);
+      }
     } catch (err) {
       console.warn('Failed saving invoice to MongoDB, falling back to local storage:', err.message);
       

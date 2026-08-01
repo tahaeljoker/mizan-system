@@ -286,6 +286,17 @@ const apiService = {
     }
   },
 
+  invoices: {
+    create: async (data) => {
+      const response = await api.post('/sales', data);
+      return response.data;
+    },
+    getAll: async (params) => {
+      const response = await api.get('/sales', { params });
+      return response.data;
+    }
+  },
+
   // 8. Shifts & Cash Registers
   shifts: {
     getAll: async (params) => {
