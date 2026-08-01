@@ -26,5 +26,5 @@ mongoose.connect(mongoURI)
 
 // Start Server
 app.listen(PORT, () => {
-  console.log(`🚀 Mizan Server listening on port ${PORT}`);
+  console.log(`🚀 Orbion ERP Server listening on port ${PORT}`);
 });

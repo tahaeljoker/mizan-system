@@ -1,8 +1,8 @@
 {
-  "name": "madar-erp-root",
+  "name": "orbion-erp-root",
   "version": "1.0.0",
   "private": true,
-  "description": "Madar ERP Cloud Monorepo Root",
+  "description": "Orbion ERP Cloud Monorepo Root",
   "scripts": {
     "postinstall": "npm install --prefix server",
     "start": "npm start --prefix server",

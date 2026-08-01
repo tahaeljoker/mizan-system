@@ -75,7 +75,7 @@ function App() {
   });
 
   React.useEffect(() => {
-    document.title = 'Orbion ERP';
+    document.title = 'Orbion ERP | Smart Business Management';
     let themeKey = 'mizan_theme';
     if (user) {
       themeKey = `mizan_theme_${user.email || user.role}`;

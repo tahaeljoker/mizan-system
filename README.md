@@ -1,4 +1,4 @@
-# 🚀 Mizan ERP/POS — Enterprise Retail & POS Platform
+# 🚀 Orbion ERP — Enterprise Retail & POS Platform
 
 Production-Ready, Enterprise-Grade Multi-Tenant Cloud ERP/POS Platform for Retail, Apparel, Boutiques, Supermarkets, and Wholesale Businesses.
 

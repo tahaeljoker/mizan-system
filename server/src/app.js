@@ -48,7 +48,7 @@ if (process.env.NODE_ENV !== 'test') {
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'Mizan ERP Backend',
+    service: 'Orbion ERP Backend',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date()
   });
@@ -57,7 +57,7 @@ app.get('/health', (req, res) => {
 app.get('/api/v1/health', (req, res) => {
   res.json({
     status: 'ok',
-    service: 'Mizan ERP API v1',
+    service: 'Orbion ERP API v1',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date()
   });

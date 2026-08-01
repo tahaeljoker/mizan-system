@@ -1,7 +1,7 @@
 {
-  "name": "mizan-server",
+  "name": "orbion-server",
   "version": "1.0.0",
-  "description": "Backend server for Mizan POS & Inventory SaaS platform",
+  "description": "Backend server for Orbion ERP POS & Inventory SaaS platform",
   "main": "index.js",
   "type": "module",
   "scripts": {
