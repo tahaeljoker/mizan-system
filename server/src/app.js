@@ -25,9 +25,32 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
+const allowedOrigins = [
+  'https://mizan-system.vercel.app',
+  'https://orbion-erp.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5000'
+];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || true,
-  credentials: true
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (
+      allowedOrigins.includes(origin) || 
+      origin.endsWith('.vercel.app') || 
+      process.env.CORS_ORIGIN === '*' || 
+      origin === process.env.CORS_ORIGIN
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
 
 app.use(cookieParser());
