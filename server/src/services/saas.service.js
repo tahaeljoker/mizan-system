@@ -188,7 +188,10 @@ export const createSubscriptionPlan = async (data) => {
    ========================================================================== */
 
 export const registerCompany = async (data) => {
-  const existingUser = await User.findOne({ email: data.email });
+  const cleanEmail = String(data.email || '').trim().toLowerCase();
+  const cleanPassword = String(data.password || '').trim();
+
+  const existingUser = await User.findOne({ email: cleanEmail });
   if (existingUser) {
     const error = new Error('البريد الإلكتروني مستخدم بالفعل لنظام آخر');
     error.statusCode = 400;
@@ -196,18 +199,18 @@ export const registerCompany = async (data) => {
   }
 
   const org = await Organization.create({
-    name: data.companyName,
-    ownerName: data.ownerName,
-    phone: data.phone,
+    name: String(data.companyName || '').trim(),
+    ownerName: String(data.ownerName || '').trim(),
+    phone: String(data.phone || '').trim(),
     plan: 'trial',
     status: 'active',
     trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
   });
 
   const ownerUser = await User.create({
-    name: data.ownerName,
-    email: data.email,
-    password: data.password,
+    name: String(data.ownerName || '').trim(),
+    email: cleanEmail,
+    password: cleanPassword,
     role: 'owner',
     orgId: org._id,
     status: 'active'

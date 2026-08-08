@@ -47,28 +47,31 @@ const getDefaultPermissionsByRole = (role) => {
  * Service: Login User
  */
 export const loginUser = async ({ email, password }, req = {}) => {
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanPassword = String(password || '').trim();
+
+  const user = await User.findOne({ email: cleanEmail });
   if (!user) {
-    const error = new Error('Invalid email or password');
+    const error = new Error('البريد الإلكتروني غير مسجل في النظام');
     error.statusCode = 401;
     throw error;
   }
 
   if (user.isDeleted || user.status === 'deleted') {
-    const error = new Error('Account has been deleted. Access denied.');
+    const error = new Error('الحساب محذوف. يرجى التواصل مع الدعم الفني.');
     error.statusCode = 403;
     throw error;
   }
 
   if (user.status === 'inactive') {
-    const error = new Error('Account is inactive. Please contact your system administrator.');
+    const error = new Error('الحساب غير مفعل حالياً.');
     error.statusCode = 403;
     throw error;
   }
 
-  const isMatch = await user.comparePassword(password);
+  const isMatch = await user.comparePassword(cleanPassword);
   if (!isMatch) {
-    const error = new Error('Invalid email or password');
+    const error = new Error('كلمة المرور غير صحيحة!');
     error.statusCode = 401;
     throw error;
   }

@@ -24,22 +24,27 @@ const Login = ({ onLoginSuccess }) => {
     setError('');
     setLoading(true);
 
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+
     try {
-      const response = await apiService.auth.login(email, password);
+      const response = await apiService.auth.login(cleanEmail, cleanPassword);
       if (response.success) {
         onLoginSuccess(response.user);
       } else {
         setError(response.message || 'خطأ في البريد الإلكتروني أو كلمة المرور!');
       }
     } catch (err) {
-      console.warn('Backend login fallback:', err.message);
-      // Fallback for default accounts
-      if (email === 'owner@mizan.com' && password === '01143632650taha') {
-        const shopUser = { role: 'owner', email: email, name: 'طه أنس (مالك المحل)' };
+      console.warn('Backend login attempt error:', err.message);
+      const apiErrorMessage = err.response?.data?.message || err.message;
+      
+      // Fallback for default offline owner account
+      if (cleanEmail === 'owner@mizan.com' && cleanPassword === '01143632650taha') {
+        const shopUser = { role: 'owner', email: cleanEmail, name: 'طه أنس (مالك المحل)' };
         localStorage.setItem('mizan_user', JSON.stringify(shopUser));
         onLoginSuccess(shopUser);
       } else {
-        setError('خطأ في البيانات الدخول! حاول مرة أخرى.');
+        setError(apiErrorMessage || 'خطأ في بيانات الدخول! يرجى التأكد من البريد وكلمة المرور.');
       }
     } finally {
       setLoading(false);

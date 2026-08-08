@@ -194,16 +194,19 @@ const Advisor = () => {
     setRegLoading(true);
 
     try {
+      const cleanEmail = regForm.email.trim().toLowerCase();
+      const cleanPassword = regForm.password.trim();
+
       const response = await apiService.saas.registerCompany({
-        companyName: regForm.companyName,
-        ownerName: regForm.ownerName,
-        phone: regForm.phone,
-        email: regForm.email,
-        password: regForm.password
+        companyName: regForm.companyName.trim(),
+        ownerName: regForm.ownerName.trim(),
+        phone: regForm.phone.trim(),
+        email: cleanEmail,
+        password: cleanPassword
       });
 
       if (response.success) {
-        alert('تم إنشاء حساب شركتك وتفعيل التجربة المجانية بنجاح.');
+        alert('تم إنشاء حساب شركتك وتفعيل التجربة المجانية بنجاح! 🚀');
         navigate('/login');
       } else {
         setRegError(response.message || 'فشل في تسجيل الشركة');
