@@ -181,9 +181,9 @@ const Landing = ({ user }) => {
 
         <div className="flex align-center gap-12">
           {user ? (
-            <Link to={user.role === 'admin' || user.role === 'SUPER_ADMIN' ? '/admin' : '/dashboard'} className="btn btn-primary" style={{ padding: '9px 22px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <Link to="/dashboard" className="btn btn-primary" style={{ padding: '9px 22px', fontSize: '13.5px', display: 'flex', gap: '6px', alignItems: 'center' }}>
               <LayoutDashboard size={16} />
-              <span>الانتقال إلى لوحة التحكم</span>
+              <span>الدخول للوحة التحكم</span>
             </Link>
           ) : (
             <>
