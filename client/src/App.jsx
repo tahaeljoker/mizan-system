@@ -21,6 +21,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
 const PriceChecker = lazy(() => import('./pages/PriceChecker'));
 const CashierShift = lazy(() => import('./pages/CashierShift'));
 const TransferLogs = lazy(() => import('./pages/TransferLogs'));
@@ -120,7 +121,7 @@ function App() {
           } />
           
           <Route path="/register" element={
-            user ? <Navigate to="/dashboard" replace /> : <Advisor />
+            user ? <Navigate to="/dashboard" replace /> : <Register onLoginSuccess={(loggedInUser) => setUser(loggedInUser)} />
           } />
 
           <Route path="/demo" element={

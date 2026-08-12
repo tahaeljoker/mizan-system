@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ShoppingBag, Eye, EyeOff, Lock, Mail, Sparkles, UserCheck } from 'lucide-react';
 import apiService from '../services/api';
 
@@ -171,6 +172,13 @@ const Login = ({ onLoginSuccess }) => {
             <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '14px', fontSize: '15px' }} disabled={loading}>
               {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول للنظام'}
             </button>
+
+            <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '13.5px', color: 'var(--text-muted)' }}>
+              <span>ليس لديك حساب بعد؟ </span>
+              <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'none' }}>
+                إنشاء حساب مؤسسة جديد (14 يوم مجاناً) 🚀
+              </Link>
+            </div>
           </form>
         </div>
 
