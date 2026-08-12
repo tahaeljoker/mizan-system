@@ -99,14 +99,45 @@ const POS = () => {
     fetchProducts();
   }, []);
 
-  // Filter products by search query with defensive Array.isArray safety
+  // Filter products by search query with defensive Array.isArray & multi-barcode safety
   const safeProductsList = Array.isArray(productsList) ? productsList : [];
   const searchResults = searchQuery
-    ? safeProductsList.filter(p => 
-        (p?.name && String(p.name).toLowerCase().includes(searchQuery.toLowerCase())) || 
-        (p?.barcode && String(p.barcode).includes(searchQuery))
-      )
+    ? safeProductsList.filter(p => {
+        const q = searchQuery.trim().toLowerCase();
+        const nameMatch = p?.name && String(p.name).toLowerCase().includes(q);
+        const barcodeMatch = p?.barcode && String(p.barcode).toLowerCase().includes(q);
+        const skuMatch = p?.sku && String(p.sku).toLowerCase().includes(q);
+        const codeMatch = p?.code && String(p.code).toLowerCase().includes(q);
+        const altBarcodesMatch = Array.isArray(p?.alternateBarcodes) && p.alternateBarcodes.some(b => String(b).toLowerCase().includes(q));
+        const categoryMatch = p?.category && String(p.category).toLowerCase().includes(q);
+        const brandMatch = p?.brand && String(p.brand).toLowerCase().includes(q);
+
+        return nameMatch || barcodeMatch || skuMatch || codeMatch || altBarcodesMatch || categoryMatch || brandMatch;
+      })
     : [];
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return;
+
+      const exactMatch = safeProductsList.find(p => 
+        (p?.barcode && String(p.barcode).toLowerCase() === q) ||
+        (p?.sku && String(p.sku).toLowerCase() === q) ||
+        (p?.code && String(p.code).toLowerCase() === q) ||
+        (Array.isArray(p?.alternateBarcodes) && p.alternateBarcodes.some(b => String(b).toLowerCase() === q)) ||
+        (p?.name && String(p.name).toLowerCase() === q)
+      ) || (searchResults.length > 0 ? searchResults[0] : null);
+
+      if (exactMatch) {
+        addToCart(exactMatch);
+        setSearchQuery('');
+      } else {
+        alert(`عذراً! لم يتم العثور على أي منتج يطابق الباركود أو الكود: "${searchQuery}" 🔍`);
+      }
+    }
+  };
 
   const handleApplyCoupon = (e) => {
     e.preventDefault();
@@ -525,9 +556,10 @@ const POS = () => {
             <Search size={18} />
             <input 
               type="text" 
-              placeholder="اكتب اسم المنتج أو كود الباركود للبحث والاستعلام السريع..." 
+              placeholder="امسح الباركود بالكاميرا/القارئ أو اكتب اسم المنتج (عربي/إنجليزي)..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               autoFocus
             />
           </div>

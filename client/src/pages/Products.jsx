@@ -86,8 +86,13 @@ const Products = () => {
 
   const filteredProducts = safeProductsList.filter((p) => {
     if (!p) return false;
-    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
-    const matchesSearch = (p.name && p.name.includes(searchQuery)) || (p.barcode && p.barcode.includes(searchQuery));
+    const q = searchQuery.trim().toLowerCase();
+    const nameMatch = p?.name && String(p.name).toLowerCase().includes(q);
+    const barcodeMatch = p?.barcode && String(p.barcode).toLowerCase().includes(q);
+    const skuMatch = p?.sku && String(p.sku).toLowerCase().includes(q);
+    const codeMatch = p?.code && String(p.code).toLowerCase().includes(q);
+    const altBarcodesMatch = Array.isArray(p?.alternateBarcodes) && p.alternateBarcodes.some(b => String(b).toLowerCase().includes(q));
+    const matchesSearch = !q || nameMatch || barcodeMatch || skuMatch || codeMatch || altBarcodesMatch;
     
     // Dead stock is defined as no sales in the last 60 days
     let matchesDeadStock = true;

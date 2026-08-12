@@ -10,8 +10,17 @@ const PriceChecker = () => {
   // Load products list from localStorage to match actual data
   const productsList = JSON.parse(localStorage.getItem('mizan_products')) || products;
 
+  const safeProducts = Array.isArray(productsList) ? productsList : [];
   const searchResults = searchQuery
-    ? productsList.filter(p => p.name.includes(searchQuery) || p.barcode.includes(searchQuery))
+    ? safeProducts.filter(p => {
+        const q = searchQuery.trim().toLowerCase();
+        const nameMatch = p?.name && String(p.name).toLowerCase().includes(q);
+        const barcodeMatch = p?.barcode && String(p.barcode).toLowerCase().includes(q);
+        const skuMatch = p?.sku && String(p.sku).toLowerCase().includes(q);
+        const codeMatch = p?.code && String(p.code).toLowerCase().includes(q);
+        const altBarcodesMatch = Array.isArray(p?.alternateBarcodes) && p.alternateBarcodes.some(b => String(b).toLowerCase().includes(q));
+        return nameMatch || barcodeMatch || skuMatch || codeMatch || altBarcodesMatch;
+      })
     : [];
 
   const handleScanBarcode = () => {
