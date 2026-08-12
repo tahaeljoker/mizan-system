@@ -122,41 +122,46 @@ const POS = () => {
   };
 
   const addToCart = (product) => {
-    const existing = cart.find(item => item.id === product.id);
+    if (!product) return;
+    const productId = product._id || product.id || product.barcode;
+    const existing = cart.find(item => (item._id || item.id) === productId);
+    
     if (existing) {
       if (existing.qty >= product.stock) {
         alert('لا توجد كمية كافية بالمخزن!');
         return;
       }
-      setCart(cart.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item));
+      setCart(cart.map(item => (item._id || item.id) === productId ? { ...item, qty: item.qty + 1 } : item));
     } else {
       if (product.stock <= 0) {
         alert('هذا المنتج غير متوفر في المخزن!');
         return;
       }
-      setCart([...cart, { ...product, qty: 1 }]);
+      setCart([...cart, { ...product, id: productId, _id: productId, qty: 1 }]);
     }
   };
 
   const updateQty = (id, delta) => {
-    const item = cart.find(i => i.id === id);
-    const prod = productsList.find(p => p.id === id);
+    const item = cart.find(i => (i._id || i.id) === id);
+    const prod = safeProductsList.find(p => (p._id || p.id) === id) || item;
     
+    if (!item) return;
+
     if (item.qty + delta <= 0) {
       removeFromCart(id);
-    } else if (item.qty + delta > prod.stock) {
+    } else if (prod && item.qty + delta > prod.stock) {
       alert('لا توجد كمية كافية بالمخزن!');
     } else {
-      setCart(cart.map(i => i.id === id ? { ...i, qty: i.qty + delta } : i));
+      setCart(cart.map(i => (i._id || i.id) === id ? { ...i, qty: i.qty + delta } : i));
     }
   };
 
   const updatePrice = (id, newPrice) => {
-    setCart(cart.map(item => item.id === id ? { ...item, sellPrice: parseFloat(newPrice) || 0 } : item));
+    setCart(cart.map(item => (item._id || item.id) === id ? { ...item, sellPrice: parseFloat(newPrice) || 0 } : item));
   };
 
   const removeFromCart = (id) => {
-    setCart(cart.filter(item => item.id !== id));
+    setCart(cart.filter(item => (item._id || item.id) !== id));
   };
 
   const getSubtotal = () => {
@@ -1033,18 +1038,20 @@ const POS = () => {
                   type="button" 
                   className="btn btn-primary w-full"
                   onClick={() => {
-                    const prod = productsList.find(p => p.id === 'p1');
+                    const prod = safeProductsList[0];
                     if (prod) {
                       addToCart(prod);
-                      setScannerFeedback(`تم مسح الباركود بنجاح: ${prod.name} (850 ج.م) 🔔`);
+                      setScannerFeedback(`تم مسح الباركود بنجاح: ${prod.name} (${prod.sellPrice} ج.م) 🔔`);
                       setTimeout(() => {
                         setShowCameraScanner(false);
                         setScannerFeedback('');
-                      }, 1500);
+                      }, 1200);
+                    } else {
+                      alert('عذراً! لا توجد بضاعة مسجلة بالنظام لمسحها.');
                     }
                   }}
                 >
-                  محاكاة مسح: فستان سواريه (6221000101)
+                  محاكاة مسح باركود بالرمز (Scan Product)
                 </button>
               </div>
             </div>
