@@ -49,31 +49,6 @@ const Landing = ({ user }) => {
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [contactSuccess, setContactSuccess] = useState(false);
 
-  // Animated Counter Effect Hook
-  const useCountUp = (end, duration = 2000) => {
-    const [count, setCount] = useState(0);
-    useEffect(() => {
-      let start = 0;
-      const increment = end / (duration / 16);
-      const timer = setInterval(() => {
-        start += increment;
-        if (start >= end) {
-          setCount(end);
-          clearInterval(timer);
-        } else {
-          setCount(Math.floor(start));
-        }
-      }, 16);
-      return () => clearInterval(timer);
-    }, [end, duration]);
-    return count;
-  };
-
-  const companiesCount = useCountUp(520);
-  const invoicesCount = useCountUp(14800);
-  const transactionsCount = useCountUp(985000);
-  const branchesCount = useCountUp(1250);
-
   const toggleFaq = (index) => {
     setOpenFaq(openFaq === index ? null : index);
   };
@@ -230,8 +205,8 @@ const Landing = ({ user }) => {
             marginBottom: '28px',
             border: '1px solid rgba(79, 70, 229, 0.2)'
           }}>
-            <Flame size={18} style={{ color: 'var(--primary)' }} />
-            <span>أكثر من 500 شركة ونشاط تجاري يثقون في منصة Orbion Cloud</span>
+            <Zap size={18} style={{ color: 'var(--primary)' }} />
+            <span>نظام سحابي متكامل ومصمم خصيصاً لإدارة المحلات والأنشطة التجارية</span>
           </div>
 
           <h1 style={{ fontSize: '48px', fontWeight: '900', lineHeight: '1.25', color: '#0f172a', marginBottom: '24px' }}>
@@ -322,58 +297,77 @@ const Landing = ({ user }) => {
         </motion.div>
       </section>
 
-      {/* SECTION 2 — Trusted Numbers (Animated Counters) */}
-      <section style={{ padding: '50px 20px', background: '#ffffff', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '30px', textAlign: 'center' }}>
-          <div>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: 'var(--primary)', marginBottom: '4px' }}>+{companiesCount}</div>
-            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 'bold' }}>شركة ومحل تجاري</div>
+      {/* SECTION 2 — Real Platform Capabilities & Guarantees */}
+      <section style={{ padding: '48px 20px', background: '#ffffff', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', textAlign: 'center' }}>
+          <div style={{ padding: '20px 16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', marginBottom: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+              <Zap size={24} />
+              <span>99.9%</span>
+            </div>
+            <div style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 'bold' }}>استقرار سحابي وسرعة فائقة</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>مزامنة لحظية بين الفروع والمخازن</div>
           </div>
-          <div>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: 'var(--primary)', marginBottom: '4px' }}>+{invoicesCount.toLocaleString()}</div>
-            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 'bold' }}>فاتورة بيع شهرياً</div>
+
+          <div style={{ padding: '20px 16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', marginBottom: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+              <Clock size={24} />
+              <span>0.5 ثانية</span>
+            </div>
+            <div style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 'bold' }}>سرعة قراءة الباركود</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>إصدار فواتير الكاشير بدون أي تأخير</div>
           </div>
-          <div>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: 'var(--primary)', marginBottom: '4px' }}>+{transactionsCount.toLocaleString()}</div>
-            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 'bold' }}>عملية مخزنية ومالية</div>
+
+          <div style={{ padding: '20px 16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--success)', marginBottom: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={24} />
+              <span>14 يوماً</span>
+            </div>
+            <div style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 'bold' }}>تجربة مجانية بالكامل</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>بدون بطاقة ائتمانية أو أي التزام</div>
           </div>
-          <div>
-            <div style={{ fontSize: '38px', fontWeight: '900', color: 'var(--success)', marginBottom: '4px' }}>+{branchesCount.toLocaleString()}</div>
-            <div style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 'bold' }}>فرع متصل بالسحابة</div>
+
+          <div style={{ padding: '20px 16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '28px', fontWeight: '900', color: 'var(--primary)', marginBottom: '4px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
+              <Headphones size={24} />
+              <span>24/7</span>
+            </div>
+            <div style={{ fontSize: '14px', color: 'var(--text-main)', fontWeight: 'bold' }}>دعم فني واستشارات مجانية</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>مساعدة فترات التجهيز والنقل للسيستم</div>
           </div>
         </div>
       </section>
 
-      {/* Customer Logos Gallery */}
-      <section style={{ padding: '40px 20px', background: 'var(--bg-app)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
-        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 'bold', display: 'block', marginBottom: '20px' }}>
-            تثق بنا أبرز الماركات وسلاسل التجزئة والمتاجر
+      {/* Industries Supported Showcase */}
+      <section style={{ padding: '48px 20px', background: 'var(--bg-app)', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+        <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <span style={{ fontSize: '14.5px', color: 'var(--text-main)', fontWeight: 'bold', display: 'block', marginBottom: '24px' }}>
+            مصمم خصيصاً لتلبية متطلبات مختلف الأنشطة التجارية والمحلات:
           </span>
-          <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap', gap: '32px' }}>
-            {['سلسلة النور', 'مودابيلا للملابس', 'مجموعة المدينة', 'أسواق الخير', 'سوبرماركت البركة', 'الشركة العربية'].map((logo, idx) => (
-              <motion.div
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '16px' }}>
+            {[
+              { icon: '👗', name: 'الملابس والأحذية', detail: 'إدارة المقاسات والألوان' },
+              { icon: '🛒', name: 'السوبرماركت والبقالة', detail: 'تاريخ الانتهاء والباركود' },
+              { icon: '☕', name: 'المطاعم والكافيهات', detail: 'الطاولات والتيك أوي' },
+              { icon: '📦', name: 'تجارة الجملة والمخازن', detail: 'إدارة الموردين والتحويلات' },
+              { icon: '📱', name: 'الأجهزة والإلكترونيات', detail: 'تتبع السيريال والضمان' },
+              { icon: '💼', name: 'الأنشطة الخدمية', detail: 'الفواتير والقيود المحاسبية' }
+            ].map((ind, idx) => (
+              <div
                 key={idx}
-                whileHover={{ scale: 1.1, filter: 'grayscale(0%)' }}
                 style={{
-                  fontSize: '15px',
-                  fontWeight: '800',
-                  color: 'var(--text-muted)',
-                  filter: 'grayscale(100%)',
-                  transition: 'all 0.3s ease',
-                  cursor: 'pointer',
-                  padding: '8px 16px',
-                  borderRadius: '8px',
+                  padding: '18px 14px',
+                  borderRadius: '14px',
                   background: '#ffffff',
                   border: '1px solid var(--border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                  textAlign: 'center',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
                 }}
               >
-                <Building size={16} />
-                <span>{logo}</span>
-              </motion.div>
+                <div style={{ fontSize: '26px', marginBottom: '8px' }}>{ind.icon}</div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-main)' }}>{ind.name}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{ind.detail}</div>
+              </div>
             ))}
           </div>
         </div>
