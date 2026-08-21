@@ -1,12 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Truck, CheckCircle2, Clock, Calendar, ArrowRight, Package } from 'lucide-react';
+import apiService from '../services/api';
 
 const TransferLogs = () => {
   const [transfers, setTransfers] = useState(() => {
-    return JSON.parse(localStorage.getItem('mizan_transfers')) || [
-      { id: 'tr1', date: '2026-07-12 01:30', from: 'الفرع الرئيسي - المهندسين', to: 'فرع مصر الجديدة', product: 'فستان سواريه مطرز', qty: 5, status: 'completed', receiveDate: '2026-07-12 14:00' }
-    ];
+    return JSON.parse(localStorage.getItem('mizan_transfers')) || [];
   });
+
+  useEffect(() => {
+    const fetchTransfers = async () => {
+      try {
+        const data = await apiService.inventory.getTransfers();
+        const raw = data?.data || data?.transfers || data;
+        if (Array.isArray(raw)) {
+          setTransfers(raw);
+        }
+      } catch (err) {
+        console.warn('API transfers fetch error:', err.message);
+      }
+    };
+    fetchTransfers();
+  }, []);
 
   const [filter, setFilter] = useState('all');
 

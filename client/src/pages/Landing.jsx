@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ShoppingBag, 
+  ShoppingBag,
+  ShoppingCart,
+  Coffee,
+  Briefcase,
   ShieldCheck, 
   Zap, 
   TrendingUp, 
@@ -346,12 +349,12 @@ const Landing = ({ user }) => {
           </span>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '16px' }}>
             {[
-              { icon: '👗', name: 'الملابس والأحذية', detail: 'إدارة المقاسات والألوان' },
-              { icon: '🛒', name: 'السوبرماركت والبقالة', detail: 'تاريخ الانتهاء والباركود' },
-              { icon: '☕', name: 'المطاعم والكافيهات', detail: 'الطاولات والتيك أوي' },
-              { icon: '📦', name: 'تجارة الجملة والمخازن', detail: 'إدارة الموردين والتحويلات' },
-              { icon: '📱', name: 'الأجهزة والإلكترونيات', detail: 'تتبع السيريال والضمان' },
-              { icon: '💼', name: 'الأنشطة الخدمية', detail: 'الفواتير والقيود المحاسبية' }
+              { icon: <ShoppingBag size={24} className="text-primary" />, name: 'الملابس والأحذية', detail: 'إدارة المقاسات والألوان' },
+              { icon: <ShoppingCart size={24} className="text-primary" />, name: 'السوبرماركت والبقالة', detail: 'تاريخ الانتهاء والباركود' },
+              { icon: <Coffee size={24} className="text-primary" />, name: 'المطاعم والكافيهات', detail: 'الطاولات والتيك أوي' },
+              { icon: <Boxes size={24} className="text-primary" />, name: 'تجارة الجملة والمخازن', detail: 'إدارة الموردين والتحويلات' },
+              { icon: <Smartphone size={24} className="text-primary" />, name: 'الأجهزة والإلكترونيات', detail: 'تتبع السيريال والضمان' },
+              { icon: <Briefcase size={24} className="text-primary" />, name: 'الأنشطة الخدمية', detail: 'الفواتير والقيود المحاسبية' }
             ].map((ind, idx) => (
               <div
                 key={idx}
@@ -361,10 +364,13 @@ const Landing = ({ user }) => {
                   background: '#ffffff',
                   border: '1px solid var(--border)',
                   textAlign: 'center',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
                 }}
               >
-                <div style={{ fontSize: '26px', marginBottom: '8px' }}>{ind.icon}</div>
+                <div style={{ marginBottom: '8px' }}>{ind.icon}</div>
                 <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--text-main)' }}>{ind.name}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{ind.detail}</div>
               </div>
@@ -611,34 +617,7 @@ const Landing = ({ user }) => {
         </div>
       </section>
 
-      {/* Testimonials Carousel / Grid */}
-      <section style={{ padding: '80px 20px', maxWidth: '1100px', margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-          <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '14px' }}>آراء عملائنا وشركاء النجاح</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '16px' }}>ثقة مئات المحلات والأنشطة التجارية في مصر والعالم العربي</p>
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
-          {testimonials.map((t, idx) => (
-            <motion.div key={idx} whileHover={{ y: -6 }} className="card" style={{ padding: '28px', border: '1px solid var(--border)', background: '#ffffff', borderRadius: '16px' }}>
-              <div className="flex justify-between align-center mb-16">
-                <div className="flex gap-4">
-                  {[...Array(t.rating)].map((_, i) => (
-                    <Star key={i} size={18} style={{ fill: '#f59e0b', color: '#f59e0b' }} />
-                  ))}
-                </div>
-              </div>
-              <p style={{ fontSize: '14.5px', color: 'var(--text-main)', lineHeight: '1.7', marginBottom: '20px', fontStyle: 'italic' }}>
-                "{t.text}"
-              </p>
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '15px' }}>{t.name}</div>
-                <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>{t.company}</div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
 
       {/* FAQ Accordion Below Pricing */}
       <section id="faq" style={{ padding: '80px 20px', background: '#ffffff', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>

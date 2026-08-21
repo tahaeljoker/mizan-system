@@ -16,10 +16,7 @@ const Branches = () => {
   // Branch Transfer States
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [transfers, setTransfers] = useState(() => {
-    return JSON.parse(localStorage.getItem('mizan_transfers')) || [
-      { id: 'tr1', date: '2026-07-12 01:30', from: 'الفرع الرئيسي - المهندسين', to: 'فرع مصر الجديدة', product: 'فستان سواريه مطرز', qty: 5, status: 'completed' },
-      { id: 'tr2', date: '2026-07-12 03:00', from: 'الفرع الرئيسي - المهندسين', to: 'فرع مصر الجديدة', product: 'بلوزة شيفون كاجوال', qty: 3, status: 'pending' }
-    ];
+    return JSON.parse(localStorage.getItem('mizan_transfers')) || [];
   });
 
   const [transferForm, setTransferForm] = useState({

@@ -100,7 +100,7 @@ const Register = ({ onLoginSuccess }) => {
           console.warn('Auto-login fallback after register:', loginErr.message);
         }
 
-        alert('تم إنشاء حساب شركتك وتفعيل التجربة المجانية 14 يوماً بنجاح! 🚀');
+        alert('تم إنشاء حساب شركتك وتفعيل التجربة المجانية 14 يوماً بنجاح!');
         navigate('/login');
       } else {
         setError(response.message || 'فشل في تسجيل الشركة');
@@ -258,7 +258,7 @@ const Register = ({ onLoginSuccess }) => {
               marginBottom: '20px',
               border: '1px solid rgba(239, 68, 68, 0.2)'
             }}>
-              ⚠️ {error}
+              {error}
             </div>
           )}
 
@@ -510,7 +510,7 @@ const Register = ({ onLoginSuccess }) => {
                   رجوع
                 </button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '14px', fontSize: '15px', fontWeight: 'bold' }} disabled={loading}>
-                  {loading ? 'جاري تجهيز سيرفر وحساب شركتك...' : 'تأكيد التسجيل وبدء التجربة المجانية 🚀'}
+                  {loading ? 'جاري تجهيز سيرفر وحساب شركتك...' : 'تأكيد التسجيل وبدء التجربة المجانية'}
                 </button>
               </div>
             </form>
@@ -519,7 +519,7 @@ const Register = ({ onLoginSuccess }) => {
           <div style={{ marginTop: '24px', borderTop: '1px solid var(--border)', paddingTop: '16px', textAlign: 'center', fontSize: '13.5px', color: 'var(--text-muted)' }}>
             <span>لديك حساب بالفعل؟ </span>
             <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'none' }}>
-              تسجيل الدخول للنظام 🔑
+              تسجيل الدخول للنظام
             </Link>
           </div>
         </div>

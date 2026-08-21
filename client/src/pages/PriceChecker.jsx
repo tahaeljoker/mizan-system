@@ -27,7 +27,7 @@ const PriceChecker = () => {
     const prod = productsList[0]; // Simulate scanning first product
     if (prod) {
       setSearchQuery(prod.barcode);
-      setScannerFeedback(`تم مسح الباركود بنجاح: ${prod.name} 🔔`);
+      setScannerFeedback(`تم مسح الباركود بنجاح: ${prod.name}`);
       setTimeout(() => {
         setShowCamera(false);
         setScannerFeedback('');
@@ -39,7 +39,7 @@ const PriceChecker = () => {
     <div style={{ maxWidth: '600px', margin: '0 auto' }}>
       <div className="flex justify-between align-center mb-24">
         <div>
-          <h1 style={{ fontSize: '28px' }}>استعلام الأسعار والمواصفات 🏷️</h1>
+          <h1 style={{ fontSize: '28px' }}>استعلام الأسعار والمواصفات</h1>
           <p style={{ color: 'var(--text-muted)' }}>ابحث عن سعر بيع أي منتج ومواصفاته المتاحة بالمعرض بسرعة.</p>
         </div>
       </div>
@@ -122,7 +122,7 @@ const PriceChecker = () => {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }}>
             <div className="modal-header">
-              <h3>ماسح الباركود بالكاميرا 📡</h3>
+              <h3>ماسح الباركود بالكاميرا</h3>
               <X className="modal-close" onClick={() => setShowCamera(false)} />
             </div>
 

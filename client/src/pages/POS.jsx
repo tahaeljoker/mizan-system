@@ -134,7 +134,7 @@ const POS = () => {
         addToCart(exactMatch);
         setSearchQuery('');
       } else {
-        alert(`عذراً! لم يتم العثور على أي منتج يطابق الباركود أو الكود: "${searchQuery}" 🔍`);
+        alert(`عذراً! لم يتم العثور على أي منتج يطابق الباركود أو الكود: "${searchQuery}"`);
       }
     }
   };
@@ -1073,7 +1073,7 @@ const POS = () => {
                     const prod = safeProductsList[0];
                     if (prod) {
                       addToCart(prod);
-                      setScannerFeedback(`تم مسح الباركود بنجاح: ${prod.name} (${prod.sellPrice} ج.م) 🔔`);
+                      setScannerFeedback(`تم مسح الباركود بنجاح: ${prod.name} (${prod.sellPrice} ج.م)`);
                       setTimeout(() => {
                         setShowCameraScanner(false);
                         setScannerFeedback('');
@@ -1141,11 +1141,11 @@ const POS = () => {
                 localStorage.setItem('mizan_shift_logs', JSON.stringify([newShiftLog, ...shiftLogs]));
 
                 if (diff === 0) {
-                  alert('الشيفت سليم 100%! الدرج متطابق تماماً بدون أي عجز أو زيادة. تم إغلاق الشيفت وحفظ السجل. 🎉');
+                  alert('الشيفت سليم 100%! الدرج متطابق تماماً بدون أي عجز أو زيادة. تم إغلاق الشيفت وحفظ السجل.');
                 } else if (diff < 0) {
-                  alert(`تنبيه عجز مالي! ⚠️\nيوجد عجز في الخزينة بقيمة: ${Math.abs(diff)} ج.م\nالرجاء إغلاق الشيفت ومراجعة الفواتير مع الموظف.`);
+                  alert(`تنبيه عجز مالي!\nيوجد عجز في الخزينة بقيمة: ${Math.abs(diff)} ج.م\nالرجاء إغلاق الشيفت ومراجعة الفواتير مع الموظف.`);
                 } else {
-                  alert(`تنبيه زيادة نقدية! 💰\nيوجد زيادة في الخزينة بقيمة: ${diff} ج.م\nتم إغلاق الشيفت وتسجيل الفائض.`);
+                  alert(`تنبيه زيادة نقدية!\nيوجد زيادة في الخزينة بقيمة: ${diff} ج.م\nتم إغلاق الشيفت وتسجيل الفائض.`);
                 }
 
                 // Reset Shift States
