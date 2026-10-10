@@ -19,7 +19,12 @@ export const protectUser = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'mizansecretkey123');
+    const secret = process.env.JWT_SECRET;
+    if (!secret && process.env.NODE_ENV === 'production') {
+      return res.status(500).json({ success: false, message: 'خطأ في إعدادات تشفير الخادم' });
+    }
+    const jwtSecret = secret || 'mizan_dev_jwt_secret_key_2026';
+    const decoded = jwt.verify(token, jwtSecret);
     const user = await User.findById(decoded.id).select('-password').lean();
     if (!user) {
       return res.status(404).json({ success: false, message: 'المستخدم غير موجود' });

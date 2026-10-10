@@ -5,6 +5,8 @@ import Return from '../../models/Return.js';
 import User from '../../models/User.js';
 import ActivityLog from '../../models/ActivityLog.js';
 
+import { getNextSequenceNumber } from '../utils/counter.js';
+
 const buildPagination = (data, page, limit, totalItems) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
@@ -24,21 +26,8 @@ const buildPagination = (data, page, limit, totalItems) => {
 /**
  * Generate sequential shift number: SHIFT-000001, SHIFT-000002...
  */
-export const generateShiftNumber = async (orgId) => {
-  const lastShift = await Shift.findOne({ orgId, shiftNumber: /^SHIFT-\d+$/ })
-    .sort({ createdAt: -1 })
-    .lean();
-
-  let nextSeq = 1;
-  if (lastShift && lastShift.shiftNumber) {
-    const match = lastShift.shiftNumber.match(/^SHIFT-(\d+)$/);
-    if (match && match[1]) {
-      nextSeq = parseInt(match[1], 10) + 1;
-    }
-  }
-
-  const seqStr = nextSeq.toString().padStart(6, '0');
-  return `SHIFT-${seqStr}`;
+export const generateShiftNumber = async (orgId, session = null) => {
+  return await getNextSequenceNumber(orgId, 'shift', { prefix: 'SHIFT', session });
 };
 
 /**

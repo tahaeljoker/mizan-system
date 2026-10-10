@@ -65,6 +65,10 @@ const saleSchema = new mongoose.Schema({
     default: 'COMPLETED'
   },
   notes: { type: String, default: '' },
+  clientRequestId: {
+    type: String,
+    required: false
+  },
   cashierId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -77,6 +81,10 @@ const saleSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 saleSchema.index({ orgId: 1, invoiceNumber: 1 }, { unique: true });
+saleSchema.index(
+  { orgId: 1, clientRequestId: 1 },
+  { unique: true, partialFilterExpression: { clientRequestId: { $type: 'string' } } }
+);
 saleSchema.index({ orgId: 1, createdAt: -1 });
 saleSchema.index({ orgId: 1, customerId: 1 });
 saleSchema.index({ orgId: 1, status: 1 });

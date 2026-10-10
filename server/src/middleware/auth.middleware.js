@@ -19,11 +19,15 @@ export const authenticate = async (req, res, next) => {
       return errorResponse(res, 'Authentication required. Please provide a valid token.', 401);
     }
 
-    const secret = process.env.JWT_SECRET || 'mizansecretkey123';
+    const secret = process.env.JWT_SECRET;
+    if (!secret && process.env.NODE_ENV === 'production') {
+      return errorResponse(res, 'Internal server configuration error', 500);
+    }
+    const jwtSecret = secret || 'mizan_dev_jwt_secret_key_2026';
     let decoded;
 
     try {
-      decoded = jwt.verify(token, secret);
+      decoded = jwt.verify(token, jwtSecret);
     } catch (err) {
       if (err.name === 'TokenExpiredError') {
         return errorResponse(res, 'Token has expired. Please log in again.', 401);

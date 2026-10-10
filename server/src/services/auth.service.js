@@ -8,8 +8,21 @@ import Role from '../../models/Role.js';
 import Permission from '../../models/Permission.js';
 import Branch from '../../models/Branch.js';
 
-const getJwtSecret = () => process.env.JWT_SECRET || 'mizansecretkey123';
-const getJwtRefreshSecret = () => process.env.JWT_REFRESH_SECRET || getJwtSecret();
+const getJwtSecret = () => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production mode.');
+  }
+  return secret || 'mizan_dev_jwt_secret_key_2026';
+};
+
+const getJwtRefreshSecret = () => {
+  const refreshSecret = process.env.JWT_REFRESH_SECRET;
+  if (!refreshSecret && process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL SECURITY ERROR: JWT_REFRESH_SECRET environment variable is missing in production mode.');
+  }
+  return refreshSecret || getJwtSecret();
+};
 
 /**
  * Get default permissions list for standard roles

@@ -3,6 +3,7 @@ import Customer from '../../models/Customer.js';
 import CustomerTransaction from '../../models/CustomerTransaction.js';
 import LoyaltyPoint from '../../models/LoyaltyPoint.js';
 import ActivityLog from '../../models/ActivityLog.js';
+import { executeTransaction } from '../utils/transaction.js';
 
 const buildPagination = (data, page, limit, totalItems) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -219,44 +220,67 @@ export const settleDebt = async (id, { amount, type = 'PAYMENT', reference = '',
     throw error;
   }
 
-  const orgId = user.orgId;
-  const customer = await Customer.findOne({ _id: id, orgId, isDeleted: { $ne: true } });
-  if (!customer) {
-    const error = new Error('Customer not found');
-    error.statusCode = 404;
+  const payAmount = Number(amount || 0);
+  if (isNaN(payAmount) || payAmount <= 0) {
+    const error = new Error('Payment amount must be a positive number');
+    error.statusCode = 400;
     throw error;
   }
 
-  const payAmount = Number(amount);
-  const balanceBefore = customer.balance;
-  const balanceAfter = balanceBefore - payAmount;
+  const orgId = user.orgId;
 
-  customer.balance = balanceAfter;
-  customer.updatedBy = user._id;
-  await customer.save();
+  return await executeTransaction(async (session) => {
+    const opts = { new: true };
+    if (session) opts.session = session;
 
-  const transaction = await CustomerTransaction.create({
-    orgId,
-    customerId: customer._id,
-    amount: payAmount,
-    balanceBefore,
-    balanceAfter,
-    type: type || 'PAYMENT',
-    reference: reference || notes || 'تسوية حساسة',
-    createdBy: user._id
+    // Atomically decrement customer balance
+    const updatedCustomer = await Customer.findOneAndUpdate(
+      { _id: id, orgId, isDeleted: { $ne: true } },
+      { $inc: { balance: -payAmount }, $set: { updatedBy: user._id } },
+      opts
+    );
+
+    if (!updatedCustomer) {
+      const error = new Error('Customer not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const balanceAfter = updatedCustomer.balance;
+    const balanceBefore = balanceAfter + payAmount;
+
+    const txOpts = {};
+    if (session) txOpts.session = session;
+
+    const [transaction] = await CustomerTransaction.create(
+      [{
+        orgId,
+        customerId: updatedCustomer._id,
+        amount: payAmount,
+        balanceBefore,
+        balanceAfter,
+        type: type || 'PAYMENT',
+        reference: reference || notes || 'تسوية حساب',
+        createdBy: user._id
+      }],
+      txOpts
+    );
+
+    await ActivityLog.create(
+      [{
+        orgId,
+        userId: user._id,
+        action: 'CUSTOMER_SETTLEMENT',
+        entity: 'Customer',
+        entityId: updatedCustomer._id,
+        details: { amount: payAmount, balanceBefore, balanceAfter },
+        ipAddress: req.ip || ''
+      }],
+      txOpts
+    );
+
+    return { customer: updatedCustomer, transaction };
   });
-
-  await ActivityLog.create({
-    orgId,
-    userId: user._id,
-    action: 'CUSTOMER_SETTLEMENT',
-    entity: 'Customer',
-    entityId: customer._id,
-    details: { amount: payAmount, balanceBefore, balanceAfter },
-    ipAddress: req.ip || ''
-  });
-
-  return { customer, transaction };
 };
 
 export const getStatement = async (id, queryParams, user) => {

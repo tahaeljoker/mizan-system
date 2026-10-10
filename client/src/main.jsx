@@ -21,3 +21,14 @@ createRoot(document.getElementById('root')).render(
     </QueryClientProvider>
   </StrictMode>
 );
+
+// Register Service Worker for Offline App Shell Loading
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      console.log('[Orbion SW] Service Worker registered with scope:', reg.scope);
+    }).catch(err => {
+      console.warn('[Orbion SW] Service Worker registration failed:', err);
+    });
+  });
+}

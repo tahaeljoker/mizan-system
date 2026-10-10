@@ -4,6 +4,8 @@ import InventoryTransaction from '../../models/InventoryTransaction.js';
 import ActivityLog from '../../models/ActivityLog.js';
 import StockCountSession from '../../models/StockCountSession.js';
 import StockTransfer from '../../models/StockTransfer.js';
+import { getNextSequenceNumber } from '../utils/counter.js';
+import { executeTransaction } from '../utils/transaction.js';
 
 const buildPaginationResponse = (data, page, limit, totalItems) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -24,41 +26,15 @@ const buildPaginationResponse = (data, page, limit, totalItems) => {
 /**
  * Sequential Transfer Numbering: TRANSFER-000001, TRANSFER-000002...
  */
-export const generateTransferNumber = async (orgId) => {
-  const lastTransfer = await StockTransfer.findOne({ orgId, transferNumber: /^TRANSFER-\d+$/ })
-    .sort({ createdAt: -1 })
-    .lean();
-
-  let nextSeq = 1;
-  if (lastTransfer && lastTransfer.transferNumber) {
-    const match = lastTransfer.transferNumber.match(/^TRANSFER-(\d+)$/);
-    if (match && match[1]) {
-      nextSeq = parseInt(match[1], 10) + 1;
-    }
-  }
-
-  const seqStr = nextSeq.toString().padStart(6, '0');
-  return `TRANSFER-${seqStr}`;
+export const generateTransferNumber = async (orgId, session = null) => {
+  return await getNextSequenceNumber(orgId, 'transfer', { prefix: 'TRANSFER', session });
 };
 
 /**
  * Sequential Count Numbering: COUNT-000001, COUNT-000002...
  */
-export const generateCountNumber = async (orgId) => {
-  const lastCount = await StockCountSession.findOne({ orgId, sessionNumber: /^COUNT-\d+$/ })
-    .sort({ createdAt: -1 })
-    .lean();
-
-  let nextSeq = 1;
-  if (lastCount && lastCount.sessionNumber) {
-    const match = lastCount.sessionNumber.match(/^COUNT-(\d+)$/);
-    if (match && match[1]) {
-      nextSeq = parseInt(match[1], 10) + 1;
-    }
-  }
-
-  const seqStr = nextSeq.toString().padStart(6, '0');
-  return `COUNT-${seqStr}`;
+export const generateCountNumber = async (orgId, session = null) => {
+  return await getNextSequenceNumber(orgId, 'stock_count', { prefix: 'COUNT', session });
 };
 
 /* ==========================================================================
@@ -860,67 +836,81 @@ export const dispatchTransfer = async (id, user, req = {}) => {
     throw error;
   }
 
-  const transfer = await StockTransfer.findOne({ _id: id, orgId: user.orgId });
-  if (!transfer) {
-    const error = new Error('Stock transfer not found');
-    error.statusCode = 404;
-    throw error;
-  }
+  return await executeTransaction(async (session) => {
+    const query = StockTransfer.findOne({ _id: id, orgId: user.orgId });
+    if (session) query.session(session);
+    const transfer = await query;
 
-  if (['IN_TRANSIT', 'RECEIVED', 'CANCELLED'].includes(transfer.status)) {
-    const error = new Error(`Cannot dispatch transfer in status ${transfer.status}`);
-    error.statusCode = 400;
-    throw error;
-  }
+    if (!transfer) {
+      const error = new Error('Stock transfer not found');
+      error.statusCode = 404;
+      throw error;
+    }
 
-  // Decrease stock from source branch & create TRANSFER_OUT InventoryTransaction
-  for (const item of transfer.items) {
-    const product = await Product.findOne({ _id: item.productId, orgId: user.orgId });
-    if (product) {
-      if (product.stock < item.quantity) {
-        const error = new Error(`Insufficient stock for '${product.name}' to dispatch transfer.`);
+    if (['IN_TRANSIT', 'RECEIVED', 'CANCELLED'].includes(transfer.status)) {
+      const error = new Error(`Cannot dispatch transfer in status ${transfer.status}`);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Decrease stock from source branch & create TRANSFER_OUT InventoryTransaction
+    for (const item of transfer.items) {
+      const opts = { new: true };
+      if (session) opts.session = session;
+
+      const updatedProd = await Product.findOneAndUpdate(
+        { _id: item.productId, orgId: user.orgId, stock: { $gte: item.quantity } },
+        { $inc: { stock: -item.quantity } },
+        opts
+      );
+
+      if (!updatedProd) {
+        const error = new Error(`Insufficient stock for product ID '${item.productId}' to dispatch transfer.`);
         error.statusCode = 400;
         throw error;
       }
 
-      const previousStock = product.stock;
-      const newStock = previousStock - item.quantity;
+      const newStock = updatedProd.stock;
+      const previousStock = newStock + item.quantity;
 
-      product.stock = newStock;
-      await product.save();
-
-      await InventoryTransaction.create({
-        orgId: user.orgId,
-        productId: product._id,
-        branchId: transfer.fromBranchId,
-        type: 'TRANSFER_OUT',
-        quantity: -item.quantity,
-        previousStock,
-        newStock,
-        reason: `إرسال تحويل مخزني رقم ${transfer.transferNumber}`,
-        reference: transfer.transferNumber,
-        referenceType: 'STOCK_TRANSFER',
-        createdBy: user._id
-      });
+      await InventoryTransaction.create(
+        [{
+          orgId: user.orgId,
+          productId: updatedProd._id,
+          branchId: transfer.fromBranchId,
+          type: 'TRANSFER_OUT',
+          quantity: -item.quantity,
+          previousStock,
+          newStock,
+          reason: `إرسال تحويل مخزني رقم ${transfer.transferNumber}`,
+          reference: transfer.transferNumber,
+          referenceType: 'STOCK_TRANSFER',
+          createdBy: user._id
+        }],
+        session ? { session } : {}
+      );
     }
-  }
 
-  transfer.status = 'IN_TRANSIT';
-  transfer.dispatchedBy = user._id;
-  transfer.dispatchedAt = new Date();
-  await transfer.save();
+    transfer.status = 'IN_TRANSIT';
+    transfer.dispatchedBy = user._id;
+    transfer.dispatchedAt = new Date();
+    await transfer.save(session ? { session } : {});
 
-  await ActivityLog.create({
-    orgId: user.orgId,
-    userId: user._id,
-    action: 'TRANSFER_DISPATCHED',
-    entity: 'StockTransfer',
-    entityId: transfer._id,
-    details: { transferNumber: transfer.transferNumber },
-    ipAddress: req.ip || ''
+    await ActivityLog.create(
+      [{
+        orgId: user.orgId,
+        userId: user._id,
+        action: 'TRANSFER_DISPATCHED',
+        entity: 'StockTransfer',
+        entityId: transfer._id,
+        details: { transferNumber: transfer.transferNumber },
+        ipAddress: req.ip || ''
+      }],
+      session ? { session } : {}
+    );
+
+    return transfer;
   });
-
-  return transfer;
 };
 
 export const approveTransfer = async (id, user, req = {}) => {
@@ -962,70 +952,86 @@ export const receiveTransfer = async (id, { items, notes }, user, req = {}) => {
     throw error;
   }
 
-  const transfer = await StockTransfer.findOne({ _id: id, orgId: user.orgId });
-  if (!transfer) {
-    const error = new Error('Stock transfer not found');
-    error.statusCode = 404;
-    throw error;
-  }
+  return await executeTransaction(async (session) => {
+    const query = StockTransfer.findOne({ _id: id, orgId: user.orgId });
+    if (session) query.session(session);
+    const transfer = await query;
 
-  if (['RECEIVED', 'CANCELLED'].includes(transfer.status)) {
-    const error = new Error(`Transfer is already ${transfer.status}`);
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const receivedMap = new Map();
-  if (items && items.length > 0) {
-    items.forEach(i => receivedMap.set(i.productId.toString(), Number(i.receivedQuantity)));
-  }
-
-  for (const item of transfer.items) {
-    const pId = item.productId.toString();
-    const qtyReceived = receivedMap.has(pId) ? receivedMap.get(pId) : item.quantity;
-    item.receivedQuantity = qtyReceived;
-
-    const product = await Product.findOne({ _id: item.productId, orgId: user.orgId });
-    if (product) {
-      const previousStock = product.stock;
-      const newStock = previousStock + qtyReceived;
-
-      product.stock = newStock;
-      await product.save();
-
-      await InventoryTransaction.create({
-        orgId: user.orgId,
-        productId: product._id,
-        branchId: transfer.toBranchId,
-        type: 'TRANSFER_IN',
-        quantity: qtyReceived,
-        previousStock,
-        newStock,
-        reason: `استلام تحويل مخزني وارد رقم ${transfer.transferNumber}`,
-        reference: transfer.transferNumber,
-        referenceType: 'STOCK_TRANSFER',
-        createdBy: user._id
-      });
+    if (!transfer) {
+      const error = new Error('Stock transfer not found');
+      error.statusCode = 404;
+      throw error;
     }
-  }
 
-  transfer.status = 'RECEIVED';
-  transfer.receivedBy = user._id;
-  transfer.receivedAt = new Date();
-  if (notes) transfer.notes = `${transfer.notes}\n[Received Notes]: ${notes}`;
-  await transfer.save();
+    if (['RECEIVED', 'CANCELLED'].includes(transfer.status)) {
+      const error = new Error(`Transfer is already ${transfer.status}`);
+      error.statusCode = 400;
+      throw error;
+    }
 
-  await ActivityLog.create({
-    orgId: user.orgId,
-    userId: user._id,
-    action: 'TRANSFER_RECEIVED',
-    entity: 'StockTransfer',
-    entityId: transfer._id,
-    details: { transferNumber: transfer.transferNumber },
-    ipAddress: req.ip || ''
+    const receivedMap = new Map();
+    if (items && items.length > 0) {
+      items.forEach(i => receivedMap.set(i.productId.toString(), Number(i.receivedQuantity)));
+    }
+
+    for (const item of transfer.items) {
+      const pId = item.productId.toString();
+      const qtyReceived = receivedMap.has(pId) ? receivedMap.get(pId) : item.quantity;
+      item.receivedQuantity = qtyReceived;
+
+      const opts = { new: true };
+      if (session) opts.session = session;
+
+      const updatedProd = await Product.findOneAndUpdate(
+        { _id: item.productId, orgId: user.orgId },
+        { $inc: { stock: qtyReceived } },
+        opts
+      );
+
+      if (updatedProd) {
+        const newStock = updatedProd.stock;
+        const previousStock = newStock - qtyReceived;
+
+        await InventoryTransaction.create(
+          [{
+            orgId: user.orgId,
+            productId: updatedProd._id,
+            branchId: transfer.toBranchId,
+            type: 'TRANSFER_IN',
+            quantity: qtyReceived,
+            previousStock,
+            newStock,
+            reason: `استلام تحويل مخزني وارد رقم ${transfer.transferNumber}`,
+            reference: transfer.transferNumber,
+            referenceType: 'STOCK_TRANSFER',
+            createdBy: user._id
+          }],
+          session ? { session } : {}
+        );
+      }
+    }
+
+    transfer.status = 'RECEIVED';
+    transfer.receivedBy = user._id;
+    transfer.receivedAt = new Date();
+    if (notes) transfer.notes = `${transfer.notes}\n[Received Notes]: ${notes}`;
+    await transfer.save(session ? { session } : {});
+
+    await ActivityLog.create(
+      [{
+        orgId: user.orgId,
+        userId: user._id,
+        action: 'TRANSFER_RECEIVED',
+        entity: 'StockTransfer',
+        entityId: transfer._id,
+        details: { transferNumber: transfer.transferNumber },
+        ipAddress: req.ip || ''
+      }],
+      session ? { session } : {}
+    );
+
+    return transfer;
   });
-
-  return transfer;
 };
 
 export const cancelTransfer = async (id, reason = '', user, req = {}) => {

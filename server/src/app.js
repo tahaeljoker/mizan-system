@@ -25,19 +25,45 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false
 }));
 
-// Universal CORS & Preflight Middleware for Vercel & Production Deployments
+// Configured Allowed Origins Whitelist Strategy
+const getAllowedOrigins = () => {
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean);
+  }
+  return [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:4173',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    'https://mizan-system.vercel.app'
+  ];
+};
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin) {
+  const allowedOrigins = getAllowedOrigins();
+
+  const isAllowed = origin && (
+    allowedOrigins.includes(origin) ||
+    (process.env.NODE_ENV !== 'production' && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')))
+  );
+
+  if (isAllowed) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-  } else {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  } else if (!origin) {
+    // Same-origin or non-browser server-to-server requests
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma, X-Client-Request-Id, X-Idempotency-Key');
   
   if (req.method === 'OPTIONS') {
+    if (origin && !isAllowed && process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ message: 'CORS origin not allowed' });
+    }
     return res.status(200).end();
   }
   next();

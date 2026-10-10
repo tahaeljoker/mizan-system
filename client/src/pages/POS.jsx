@@ -24,6 +24,9 @@ import {
 } from 'lucide-react';
 import { products, customers as initialCustomers } from '../data/mockData';
 import apiService from '../services/api';
+import ConnectionStatusBadge from '../components/POS/ConnectionStatusBadge';
+import { initDB, cacheProducts, getCachedProducts, addPendingSale, updateCachedProductStock } from '../services/db';
+import { initSyncEngine, processPendingSyncQueue } from '../services/syncEngine';
 
 const POS = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,19 +87,34 @@ const POS = () => {
   });
 
   React.useEffect(() => {
-    const fetchProducts = async () => {
+    const initializePOSOfflineEngine = async () => {
       try {
+        await initDB();
+        initSyncEngine();
+
         const data = await apiService.products.getAll();
         const rawList = data?.data || data?.products || data;
         const safeList = Array.isArray(rawList) ? rawList : (Array.isArray(data) ? data : []);
         if (safeList.length > 0) {
           setProductsList(safeList);
+          await cacheProducts(safeList);
+        } else {
+          const cached = await getCachedProducts();
+          if (cached && cached.length > 0) setProductsList(cached);
         }
       } catch (err) {
-        console.warn('Failed to load products from API, loading local backup:', err.message);
+        console.warn('[POS] Product API fetch failed, switching to IndexedDB cache:', err.message);
+        try {
+          const cached = await getCachedProducts();
+          if (cached && cached.length > 0) {
+            setProductsList(cached);
+          }
+        } catch (dbErr) {
+          console.warn('[POS] IndexedDB read error:', dbErr.message);
+        }
       }
     };
-    fetchProducts();
+    initializePOSOfflineEngine();
   }, []);
 
   // Filter products by search query with defensive Array.isArray & multi-barcode safety
@@ -271,9 +289,31 @@ const POS = () => {
       }
     }
 
-    const invoiceId = 'inv-' + Math.floor(1000 + Math.random() * 9000);
+    const clientRequestId = crypto.randomUUID();
+    const tempInvoiceNumber = `OFFLINE-${Date.now().toString().slice(-6)}`;
+
+    const salePayload = {
+      clientRequestId,
+      customerName,
+      customerPhone,
+      notes: invoiceNotes,
+      discount: getDiscountAmount(),
+      payments: [{
+        method: paymentMethod === 'كاش' ? 'CASH' : (paymentMethod === 'شبكة' ? 'CARD' : 'DEBT'),
+        amount: getTotal()
+      }],
+      items: cart.map(i => ({
+        productId: i._id || i.id || i.productId,
+        name: i.name,
+        quantity: i.qty,
+        unitPrice: i.sellPrice,
+        total: i.sellPrice * i.qty
+      }))
+    };
+
     const invoice = {
-      id: invoiceId,
+      id: tempInvoiceNumber,
+      clientRequestId,
       customer: customerName,
       customerPhone: customerPhone,
       notes: invoiceNotes,
@@ -284,57 +324,67 @@ const POS = () => {
       total: getTotal(),
       paymentMethod,
       cashier: 'سارة أحمد',
-      isOffline: !isOnline
+      isOffline: !navigator.onLine,
+      syncStatus: navigator.onLine ? 'SYNCED' : 'PENDING'
     };
 
-    try {
-      // 1. Try sending to Express / MongoDB backend
-      const invoicePayload = {
-        customer: customerName,
-        discount: getDiscountAmount(),
-        paymentMethod,
-        items: cart.map(i => ({
-          id: i._id || i.id,
-          name: i.name,
-          qty: i.qty,
-          price: i.sellPrice
-        }))
-      };
-      
-      const savedInvoice = await apiService.invoices.create(invoicePayload);
-      
-      // Update local invoice state with database invoice structure
-      invoice.id = savedInvoice.id || savedInvoice._id;
-      
-      // Refresh products from server to keep stock in sync
-      const updatedProds = await apiService.products.getAll();
-      const rawProds = updatedProds?.data || updatedProds?.products || updatedProds;
-      const safeProds = Array.isArray(rawProds) ? rawProds : (Array.isArray(updatedProds) ? updatedProds : []);
-      if (safeProds.length > 0) {
-        setProductsList(safeProds);
+    let serverSuccess = false;
+
+    if (navigator.onLine) {
+      try {
+        const savedSale = await apiService.sales.create(salePayload);
+        if (savedSale && (savedSale.invoiceNumber || savedSale._id)) {
+          invoice.id = savedSale.invoiceNumber || savedSale._id;
+          invoice.isOffline = false;
+          invoice.syncStatus = 'SYNCED';
+          serverSuccess = true;
+
+          // Refresh products from server to keep stock in sync
+          const updatedProds = await apiService.products.getAll();
+          const rawProds = updatedProds?.data || updatedProds?.products || updatedProds;
+          const safeProds = Array.isArray(rawProds) ? rawProds : (Array.isArray(updatedProds) ? updatedProds : []);
+          if (safeProds.length > 0) {
+            setProductsList(safeProds);
+            await cacheProducts(safeProds);
+          }
+        }
+      } catch (err) {
+        console.warn('[POS] Direct server checkout failed, storing offline in IndexedDB:', err.message);
       }
-    } catch (err) {
-      console.warn('Failed saving invoice to MongoDB, falling back to local storage:', err.message);
-      
-      // Fallback local storage stock deduction
+    }
+
+    if (!serverSuccess) {
+      invoice.isOffline = true;
+      invoice.syncStatus = 'PENDING';
+
+      // 1. Save to IndexedDB pending queue
+      await addPendingSale({
+        clientRequestId,
+        invoiceNumber: tempInvoiceNumber,
+        payload: salePayload,
+        displayInvoice: invoice
+      });
+
+      // 2. Deduct local stock in IndexedDB & component state
+      for (const item of cart) {
+        const pId = (item._id || item.id || item.productId)?.toString();
+        if (pId) {
+          await updateCachedProductStock(pId, -item.qty);
+        }
+      }
+
       const updatedProducts = productsList.map(p => {
-        const cartItem = cart.find(item => item.id === p.id || item._id === p._id);
+        const cartItem = cart.find(item => (item.id || item._id) === (p.id || p._id));
         if (cartItem) {
           return { ...p, stock: Math.max(0, p.stock - cartItem.qty) };
         }
         return p;
       });
       setProductsList(updatedProducts);
-      localStorage.setItem('mizan_products', JSON.stringify(updatedProducts));
 
-      // Fallback save invoice to local sales history
-      const history = JSON.parse(localStorage.getItem('mizan_sales_history')) || [];
-      localStorage.setItem('mizan_sales_history', JSON.stringify([invoice, ...history]));
-
-      if (!isOnline) {
-        const storedOffline = JSON.parse(localStorage.getItem('mizan_offline_invoices')) || [];
-        localStorage.setItem('mizan_offline_invoices', JSON.stringify([...storedOffline, invoice]));
-        alert('تم حفظ الفاتورة محلياً في المتصفح! سيتم رفعها ومزامنتها تلقائياً بمجرد عودة الاتصال 📡');
+      // Trigger background sync if online
+      if (navigator.onLine) {
+        processPendingSyncQueue();
       }
     }
 
@@ -505,37 +555,7 @@ const POS = () => {
                 إغلاق الشيفت
               </button>
 
-              <button 
-                className="btn" 
-                style={{ 
-                  padding: '6px 12px', 
-                  fontSize: '12px', 
-                  display: 'flex', 
-                  gap: '6px', 
-                  alignItems: 'center', 
-                  background: isOnline ? 'var(--success-glow)' : 'var(--danger-glow)',
-                  color: isOnline ? 'var(--success)' : 'var(--danger)',
-                  border: isOnline ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.3)'
-                }}
-                onClick={() => {
-                  if (!isOnline) {
-                    const storedOffline = JSON.parse(localStorage.getItem('mizan_offline_invoices')) || [];
-                    if (storedOffline.length > 0) {
-                      alert(`تم استعادة الاتصال بالإنترنت! 📡\nجاري مزامنة ${storedOffline.length} فواتير مع السيرفر الرئيسي...\nتمت المزامنة وحفظ المبيعات بنجاح! 🚀`);
-                      localStorage.removeItem('mizan_offline_invoices');
-                    } else {
-                      alert('أنت متصل بالإنترنت الآن! 📡');
-                    }
-                  } else {
-                    alert('لقد انقطع الاتصال بالإنترنت! تم الانتقال لوضع العمل دون اتصال (Offline Mode).');
-                  }
-                  setIsOnline(!isOnline);
-                }}
-                type="button"
-              >
-                {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
-                <span>{isOnline ? 'متصل' : 'أوفلاين'}</span>
-              </button>
+              <ConnectionStatusBadge />
 
               <button 
                 className="btn btn-secondary" 
@@ -571,7 +591,7 @@ const POS = () => {
               <div key={p.id} className="flex justify-between align-center" style={{ padding: '12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', marginBottom: '8px' }}>
                 <div>
                   <strong style={{ fontSize: '14px', display: 'block' }}>{p.name}</strong>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الباركود: {p.barcode} | المتاح: <span className={p.stock <= p.minStock ? 'text-danger' : 'text-success'}>{p.stock} قطعة</span></span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>الباركود: {p.barcode} | المتاح (حسب آخر مزامنة): <span className={p.stock <= p.minStock ? 'text-danger' : 'text-success'}>{p.stock} قطعة</span></span>
                 </div>
                 <div className="flex gap-8 align-center">
                   <button 
@@ -637,8 +657,8 @@ const POS = () => {
                   <div style={{ fontWeight: 'bold', fontFamily: 'var(--font-en)' }}>{inquiredProduct.barcode}</div>
                 </div>
                 <div>
-                  <span style={{ color: 'var(--text-muted)' }}>سعر البيع (تجزئة):</span>
-                  <div style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{inquiredProduct.sellPrice} ج.م</div>
+                  <span style={{ color: 'var(--text-muted)' }}>المخزون بالمحل (آخر مزامنة):</span>
+                  <div style={{ fontWeight: 'bold' }}>{inquiredProduct.stock} قطعة</div>
                 </div>
                 <div>
                   <span style={{ color: 'var(--text-muted)' }}>سعر الشراء (التكلفة):</span>
@@ -939,6 +959,19 @@ const POS = () => {
               <div className="flex justify-between">
                 <span>رقم الفاتورة:</span>
                 <span style={{ fontWeight: 'bold' }}>{lastInvoice.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>حالة الفاتورة:</span>
+                <span style={{ 
+                  fontWeight: 'bold', 
+                  color: lastInvoice.isOffline ? '#d97706' : '#16a34a',
+                  background: lastInvoice.isOffline ? '#fffbeb' : '#f0fdf4',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  fontSize: '11px'
+                }}>
+                  {lastInvoice.isOffline ? 'أوفلاين (معلقة بالمزامنة 📡)' : 'أونلاين (تم الحفظ بالسيرفر 🟢)'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>التاريخ:</span>

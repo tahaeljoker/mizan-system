@@ -6,6 +6,9 @@ import InventoryTransaction from '../../models/InventoryTransaction.js';
 import SupplierTransaction from '../../models/SupplierTransaction.js';
 import ActivityLog from '../../models/ActivityLog.js';
 
+import { getNextSequenceNumber } from '../utils/counter.js';
+import { executeTransaction } from '../utils/transaction.js';
+
 const buildPagination = (data, page, limit, totalItems) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
@@ -87,51 +90,62 @@ export const createPurchaseOrder = async (data, user, req = {}) => {
     throw error;
   }
 
-  const supplier = await Supplier.findOne({ _id: data.supplierId, orgId, isDeleted: { $ne: true } });
-  if (!supplier) {
-    const error = new Error('Supplier not found');
-    error.statusCode = 404;
-    throw error;
-  }
+  return await executeTransaction(async (session) => {
+    const supplierQuery = Supplier.findOne({ _id: data.supplierId, orgId, isDeleted: { $ne: true } });
+    if (session) supplierQuery.session(session);
+    const supplier = await supplierQuery;
 
-  const poNumber = `PO-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+    if (!supplier) {
+      const error = new Error('Supplier not found');
+      error.statusCode = 404;
+      throw error;
+    }
 
-  let totalAmount = 0;
-  const items = data.items.map(item => {
-    const qty = Math.max(1, Number(item.quantity));
-    const cost = Math.max(0, Number(item.costPrice));
-    totalAmount += qty * cost;
-    return {
-      productId: item.productId,
-      quantity: qty,
-      costPrice: cost,
-      receivedQuantity: 0
-    };
+    const poNumber = await getNextSequenceNumber(orgId, 'purchase_order', { prefix: 'PO', session });
+
+    let totalAmount = 0;
+    const items = data.items.map(item => {
+      const qty = Math.max(1, Number(item.quantity));
+      const cost = Math.max(0, Number(item.costPrice));
+      totalAmount += qty * cost;
+      return {
+        productId: item.productId,
+        quantity: qty,
+        costPrice: cost,
+        receivedQuantity: 0
+      };
+    });
+
+    const [order] = await PurchaseOrder.create(
+      [{
+        orgId,
+        purchaseOrderNumber: poNumber,
+        supplierId: supplier._id,
+        branchId: data.branchId || user.branchId || null,
+        status: 'DRAFT',
+        items,
+        totalAmount,
+        notes: data.notes || '',
+        createdBy: user._id
+      }],
+      session ? { session } : {}
+    );
+
+    await ActivityLog.create(
+      [{
+        orgId,
+        userId: user._id,
+        action: 'PURCHASE_ORDER_CREATED',
+        entity: 'PurchaseOrder',
+        entityId: order._id,
+        details: { purchaseOrderNumber: poNumber, totalAmount, itemCount: items.length },
+        ipAddress: req.ip || ''
+      }],
+      session ? { session } : {}
+    );
+
+    return order;
   });
-
-  const order = await PurchaseOrder.create({
-    orgId,
-    purchaseOrderNumber: poNumber,
-    supplierId: supplier._id,
-    branchId: data.branchId || user.branchId || null,
-    status: 'DRAFT',
-    items,
-    totalAmount,
-    notes: data.notes || '',
-    createdBy: user._id
-  });
-
-  await ActivityLog.create({
-    orgId,
-    userId: user._id,
-    action: 'PURCHASE_ORDER_CREATED',
-    entity: 'PurchaseOrder',
-    entityId: order._id,
-    details: { purchaseOrderNumber: poNumber, totalAmount, itemCount: items.length },
-    ipAddress: req.ip || ''
-  });
-
-  return order;
 };
 
 export const updatePurchaseOrder = async (id, data, user, req = {}) => {
@@ -200,100 +214,126 @@ export const receivePurchaseOrder = async (id, { items, notes }, user, req = {})
   }
 
   const orgId = user.orgId;
-  const order = await PurchaseOrder.findOne({ _id: id, orgId });
 
-  if (!order) {
-    const error = new Error('Purchase order not found');
-    error.statusCode = 404;
-    throw error;
-  }
+  return await executeTransaction(async (session) => {
+    const query = PurchaseOrder.findOne({ _id: id, orgId });
+    if (session) query.session(session);
+    const order = await query;
 
-  if (['RECEIVED', 'CANCELLED'].includes(order.status)) {
-    const error = new Error(`Purchase order is already ${order.status}`);
-    error.statusCode = 400;
-    throw error;
-  }
+    if (!order) {
+      const error = new Error('Purchase order not found');
+      error.statusCode = 404;
+      throw error;
+    }
 
-  const receivedMap = new Map();
-  if (items && items.length > 0) {
-    items.forEach(i => receivedMap.set(i.productId.toString(), Number(i.receivedQuantity)));
-  }
+    if (['RECEIVED', 'CANCELLED'].includes(order.status)) {
+      const error = new Error(`Purchase order is already ${order.status}`);
+      error.statusCode = 400;
+      throw error;
+    }
 
-  let totalReceivedValue = 0;
+    const receivedMap = new Map();
+    if (items && items.length > 0) {
+      items.forEach(i => receivedMap.set(i.productId.toString(), Number(i.receivedQuantity)));
+    }
 
-  // Atomically update product stock and create InventoryTransaction records
-  for (const item of order.items) {
-    const pId = item.productId.toString();
-    const qtyToReceive = receivedMap.has(pId) ? receivedMap.get(pId) : item.quantity;
-    item.receivedQuantity = qtyToReceive;
-    totalReceivedValue += qtyToReceive * item.costPrice;
+    let totalReceivedValue = 0;
 
-    if (qtyToReceive > 0) {
-      const product = await Product.findOne({ _id: item.productId, orgId });
-      if (product) {
-        const previousStock = product.stock;
-        const newStock = previousStock + qtyToReceive;
+    // Atomically update product stock and create InventoryTransaction records
+    for (const item of order.items) {
+      const pId = item.productId.toString();
+      const qtyToReceive = receivedMap.has(pId) ? receivedMap.get(pId) : item.quantity;
+      item.receivedQuantity = qtyToReceive;
+      totalReceivedValue += qtyToReceive * item.costPrice;
 
-        product.stock = newStock;
-        product.costPrice = item.costPrice; // Update cost price to latest received cost
-        await product.save();
+      if (qtyToReceive > 0) {
+        const opts = { new: true };
+        if (session) opts.session = session;
 
-        await InventoryTransaction.create({
-          orgId,
-          productId: product._id,
-          branchId: order.branchId || product.branchId || null,
-          type: 'PURCHASE',
-          quantity: qtyToReceive,
-          previousStock,
-          newStock,
-          reason: `استلام أمر شراء رقم ${order.purchaseOrderNumber}`,
-          reference: order.purchaseOrderNumber,
-          referenceType: 'PURCHASE_ORDER',
-          createdBy: user._id
-        });
+        const updatedProd = await Product.findOneAndUpdate(
+          { _id: item.productId, orgId },
+          { $inc: { stock: qtyToReceive }, $set: { costPrice: item.costPrice } },
+          opts
+        );
+
+        if (updatedProd) {
+          const newStock = updatedProd.stock;
+          const previousStock = newStock - qtyToReceive;
+
+          await InventoryTransaction.create(
+            [{
+              orgId,
+              productId: updatedProd._id,
+              branchId: order.branchId || updatedProd.branchId || null,
+              type: 'PURCHASE',
+              quantity: qtyToReceive,
+              previousStock,
+              newStock,
+              reason: `استلام أمر شراء رقم ${order.purchaseOrderNumber}`,
+              reference: order.purchaseOrderNumber,
+              referenceType: 'PURCHASE_ORDER',
+              createdBy: user._id
+            }],
+            session ? { session } : {}
+          );
+        }
       }
     }
-  }
 
-  // Update Supplier balance & create SupplierTransaction ledger entry
-  const supplier = await Supplier.findOne({ _id: order.supplierId, orgId });
-  if (supplier) {
-    const balanceBefore = supplier.balance;
-    const balanceAfter = balanceBefore + totalReceivedValue;
+    // Update Supplier balance & create SupplierTransaction ledger entry
+    const supplierQuery = Supplier.findOne({ _id: order.supplierId, orgId });
+    if (session) supplierQuery.session(session);
+    const supplier = await supplierQuery;
 
-    supplier.balance = balanceAfter;
-    supplier.updatedBy = user._id;
-    await supplier.save();
+    if (supplier) {
+      const balanceBefore = supplier.balance;
+      const balanceAfter = balanceBefore + totalReceivedValue;
 
-    await SupplierTransaction.create({
-      orgId,
-      supplierId: supplier._id,
-      amount: totalReceivedValue,
-      balanceBefore,
-      balanceAfter,
-      type: 'PURCHASE_ORDER',
-      reference: order.purchaseOrderNumber,
-      createdBy: user._id
-    });
-  }
+      const suppOpts = {};
+      if (session) suppOpts.session = session;
 
-  order.status = 'RECEIVED';
-  order.receivedBy = user._id;
-  order.receivedAt = new Date();
-  if (notes) order.notes = `${order.notes}\n[Received Notes]: ${notes}`;
-  await order.save();
+      await Supplier.findOneAndUpdate(
+        { _id: supplier._id, orgId },
+        { $inc: { balance: totalReceivedValue }, $set: { updatedBy: user._id } },
+        suppOpts
+      );
 
-  await ActivityLog.create({
-    orgId,
-    userId: user._id,
-    action: 'PURCHASE_ORDER_RECEIVED',
-    entity: 'PurchaseOrder',
-    entityId: order._id,
-    details: { purchaseOrderNumber: order.purchaseOrderNumber, totalReceivedValue },
-    ipAddress: req.ip || ''
+      await SupplierTransaction.create(
+        [{
+          orgId,
+          supplierId: supplier._id,
+          amount: totalReceivedValue,
+          balanceBefore,
+          balanceAfter,
+          type: 'PURCHASE_ORDER',
+          reference: order.purchaseOrderNumber,
+          createdBy: user._id
+        }],
+        session ? { session } : {}
+      );
+    }
+
+    order.status = 'RECEIVED';
+    order.receivedBy = user._id;
+    order.receivedAt = new Date();
+    if (notes) order.notes = `${order.notes}\n[Received Notes]: ${notes}`;
+    await order.save(session ? { session } : {});
+
+    await ActivityLog.create(
+      [{
+        orgId,
+        userId: user._id,
+        action: 'PURCHASE_ORDER_RECEIVED',
+        entity: 'PurchaseOrder',
+        entityId: order._id,
+        details: { purchaseOrderNumber: order.purchaseOrderNumber, totalReceivedValue },
+        ipAddress: req.ip || ''
+      }],
+      session ? { session } : {}
+    );
+
+    return order;
   });
-
-  return order;
 };
 
 export const cancelPurchaseOrder = async (id, reason = '', user, req = {}) => {

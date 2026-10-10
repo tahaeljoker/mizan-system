@@ -8,6 +8,9 @@ import LoyaltyPoint from '../../models/LoyaltyPoint.js';
 import InventoryTransaction from '../../models/InventoryTransaction.js';
 import ActivityLog from '../../models/ActivityLog.js';
 
+import { getNextSequenceNumber } from '../utils/counter.js';
+import { executeTransaction } from '../utils/transaction.js';
+
 const buildPagination = (data, page, limit, totalItems) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
@@ -26,27 +29,16 @@ const buildPagination = (data, page, limit, totalItems) => {
 
 /**
  * Auto-generate sequential invoice number: INV-000001, INV-000002...
+ * Uses atomic MongoDB counter scoped to tenant (orgId)
  */
-export const generateInvoiceNumber = async (orgId) => {
-  const lastSale = await Sale.findOne({ orgId, invoiceNumber: /^INV-\d+$/ })
-    .sort({ createdAt: -1 })
-    .lean();
-
-  let nextSeq = 1;
-  if (lastSale && lastSale.invoiceNumber) {
-    const match = lastSale.invoiceNumber.match(/^INV-(\d+)$/);
-    if (match && match[1]) {
-      nextSeq = parseInt(match[1], 10) + 1;
-    }
-  }
-
-  const seqStr = nextSeq.toString().padStart(6, '0');
-  return `INV-${seqStr}`;
+export const generateInvoiceNumber = async (orgId, session = null) => {
+  return await getNextSequenceNumber(orgId, 'invoice', { prefix: 'INV', session });
 };
 
 export const createSale = async (data, user, req = {}) => {
   const orgId = user.orgId;
   const cashierId = user._id;
+  const clientRequestId = data.clientRequestId || data.idempotencyKey || req.headers?.['x-client-request-id'] || req.headers?.['x-idempotency-key'] || null;
 
   if (!data.items || data.items.length === 0) {
     const error = new Error('Sale must contain at least one item');
@@ -54,206 +46,274 @@ export const createSale = async (data, user, req = {}) => {
     throw error;
   }
 
-  // Step 1: Validate stock for all items
-  const processedItems = [];
-  let calculatedSubtotal = 0;
-
-  for (const item of data.items) {
-    if (!mongoose.Types.ObjectId.isValid(item.productId)) {
-      const error = new Error(`Invalid product ID format: ${item.productId}`);
-      error.statusCode = 400;
-      throw error;
+  // Pre-check for existing Sale created by exact same clientRequestId for this organization
+  if (clientRequestId) {
+    const existingSale = await Sale.findOne({ orgId, clientRequestId });
+    if (existingSale) {
+      return await getSaleById(existingSale._id, user);
     }
-
-    const product = await Product.findOne({ _id: item.productId, orgId, isDeleted: { $ne: true } });
-    if (!product) {
-      const error = new Error(`Product not found: ${item.productId}`);
-      error.statusCode = 404;
-      throw error;
-    }
-
-    const qty = Number(item.quantity);
-    if (product.stock < qty) {
-      const error = new Error(`Insufficient stock for product '${product.name}'. Available: ${product.stock}, Requested: ${qty}`);
-      error.statusCode = 400;
-      throw error;
-    }
-
-    const unitPrice = item.unitPrice !== undefined ? Number(item.unitPrice) : product.sellPrice;
-    const discount = Number(item.discount || 0);
-    const total = Math.max(0, (qty * unitPrice) - discount);
-
-    calculatedSubtotal += total;
-
-    processedItems.push({
-      productId: product._id,
-      name: product.name,
-      unit: product.unit || 'قطعة',
-      quantity: qty,
-      unitPrice,
-      discount,
-      total,
-      productRef: product
-    });
   }
 
-  const overallDiscount = Number(data.discount || 0);
-  const tax = Number(data.tax || 0);
-  const totalAmount = Math.max(0, calculatedSubtotal - overallDiscount + tax);
+  try {
+    return await executeTransaction(async (session) => {
+      // Step 1: Validate stock for all items
+      const processedItems = [];
+      let calculatedSubtotal = 0;
 
-  // Step 2: Handle Payments & Calculate Debt
-  let payments = data.payments || [];
-  let paidAmount = 0;
-  let debtAmount = 0;
+      for (const item of data.items) {
+        if (!mongoose.Types.ObjectId.isValid(item.productId)) {
+          const error = new Error(`Invalid product ID format: ${item.productId}`);
+          error.statusCode = 400;
+          throw error;
+        }
 
-  payments.forEach(p => {
-    paidAmount += Number(p.amount || 0);
-    if (p.method === 'DEBT') {
-      debtAmount += Number(p.amount || 0);
-    }
-  });
+        const query = Product.findOne({ _id: item.productId, orgId, isDeleted: { $ne: true } });
+        if (session) query.session(session);
+        const product = await query;
 
-  // If paidAmount is less than totalAmount, the remainder is treated as DEBT
-  const remainingDue = totalAmount - paidAmount;
-  if (remainingDue > 0.01) {
-    debtAmount += remainingDue;
-    payments.push({
-      method: 'DEBT',
-      amount: remainingDue,
-      reference: 'أجل / آجل'
-    });
-    paidAmount += remainingDue;
-  }
+        if (!product) {
+          const error = new Error(`Product not found: ${item.productId}`);
+          error.statusCode = 404;
+          throw error;
+        }
 
-  // If there is debt amount, customerId must be provided
-  let customer = null;
-  if (debtAmount > 0 || data.customerId) {
-    if (data.customerId) {
-      if (!mongoose.Types.ObjectId.isValid(data.customerId)) {
-        const error = new Error('Invalid customer ID format');
-        error.statusCode = 400;
-        throw error;
+        const qty = Number(item.quantity);
+        if (product.stock < qty) {
+          const error = new Error(`Insufficient stock for product '${product.name}'. Available: ${product.stock}, Requested: ${qty}`);
+          error.statusCode = 400;
+          throw error;
+        }
+
+        const unitPrice = item.unitPrice !== undefined ? Number(item.unitPrice) : product.sellPrice;
+        const discount = Number(item.discount || 0);
+        const total = Math.max(0, (qty * unitPrice) - discount);
+
+        calculatedSubtotal += total;
+
+        processedItems.push({
+          productId: product._id,
+          name: product.name,
+          unit: product.unit || 'قطعة',
+          quantity: qty,
+          unitPrice,
+          discount,
+          total,
+          productRef: product
+        });
       }
-      customer = await Customer.findOne({ _id: data.customerId, orgId, isDeleted: { $ne: true } });
-      if (!customer) {
-        const error = new Error('Customer not found');
-        error.statusCode = 404;
-        throw error;
-      }
-    } else if (debtAmount > 0) {
-      const error = new Error('Customer must be selected for debt/credit sales');
-      error.statusCode = 400;
-      throw error;
-    }
-  }
 
-  // Step 3: Generate Invoice Number
-  const invoiceNumber = await generateInvoiceNumber(orgId);
+      const overallDiscount = Number(data.discount || 0);
+      const tax = Number(data.tax || 0);
+      const totalAmount = Math.max(0, calculatedSubtotal - overallDiscount + tax);
 
-  // Step 4: Decrease stock and record InventoryTransaction
-  for (const item of processedItems) {
-    const product = item.productRef;
-    const previousStock = product.stock;
-    const newStock = previousStock - item.quantity;
+      // Step 2: Handle Payments & Calculate Debt
+      let payments = data.payments || [];
+      let paidAmount = 0;
+      let debtAmount = 0;
 
-    product.stock = newStock;
-    await product.save();
-
-    await InventoryTransaction.create({
-      orgId,
-      productId: product._id,
-      branchId: data.branchId || product.branchId || user.branchId || null,
-      type: 'SALE',
-      quantity: -item.quantity,
-      previousStock,
-      newStock,
-      reason: `عملية بيع بفاتورة رقم ${invoiceNumber}`,
-      reference: invoiceNumber,
-      referenceType: 'SALE_INVOICE',
-      createdBy: cashierId
-    });
-  }
-
-  // Step 5: Update Customer Debt & Ledger if applicable
-  if (customer && debtAmount > 0) {
-    const balanceBefore = customer.balance;
-    const balanceAfter = balanceBefore + debtAmount;
-
-    customer.balance = balanceAfter;
-    customer.updatedBy = cashierId;
-    await customer.save();
-
-    await CustomerTransaction.create({
-      orgId,
-      customerId: customer._id,
-      amount: debtAmount,
-      balanceBefore,
-      balanceAfter,
-      type: 'SALE',
-      reference: invoiceNumber,
-      createdBy: cashierId
-    });
-  }
-
-  // Step 6: Calculate Loyalty Points if Customer attached
-  if (customer) {
-    const pointsEarned = Math.floor(totalAmount / 10); // 1 point per 10 currency units
-    if (pointsEarned > 0) {
-      customer.loyaltyPoints += pointsEarned;
-      await customer.save();
-
-      await LoyaltyPoint.create({
-        orgId,
-        customerId: customer._id,
-        points: pointsEarned,
-        type: 'EARN',
-        description: `نقاط مكتسبة من الفاتورة رقم ${invoiceNumber}`,
-        createdBy: cashierId
+      payments.forEach(p => {
+        paidAmount += Number(p.amount || 0);
+        if (p.method === 'DEBT') {
+          debtAmount += Number(p.amount || 0);
+        }
       });
+
+      const remainingDue = totalAmount - paidAmount;
+      if (remainingDue > 0.01) {
+        debtAmount += remainingDue;
+        payments.push({
+          method: 'DEBT',
+          amount: remainingDue,
+          reference: 'أجل / آجل'
+        });
+        paidAmount += remainingDue;
+      }
+
+      let customer = null;
+      if (debtAmount > 0 || data.customerId) {
+        if (data.customerId) {
+          if (!mongoose.Types.ObjectId.isValid(data.customerId)) {
+            const error = new Error('Invalid customer ID format');
+            error.statusCode = 400;
+            throw error;
+          }
+          const custQuery = Customer.findOne({ _id: data.customerId, orgId, isDeleted: { $ne: true } });
+          if (session) custQuery.session(session);
+          customer = await custQuery;
+          if (!customer) {
+            const error = new Error('Customer not found');
+            error.statusCode = 404;
+            throw error;
+          }
+        } else if (debtAmount > 0) {
+          const error = new Error('Customer must be selected for debt/credit sales');
+          error.statusCode = 400;
+          throw error;
+        }
+      }
+
+      // Step 3: Generate Atomic Invoice Number
+      const invoiceNumber = await generateInvoiceNumber(orgId, session);
+
+      // Step 4: Save Sale Document FIRST (Claims clientRequestId and invoiceNumber to prevent duplicate stock mutations)
+      const salePayload = {
+        orgId,
+        invoiceNumber,
+        branchId: data.branchId || user.branchId || null,
+        shiftId: data.shiftId || null,
+        customerId: customer ? customer._id : null,
+        items: processedItems.map(i => ({
+          productId: i.productId,
+          name: i.name,
+          unit: i.unit,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          discount: i.discount,
+          total: i.total
+        })),
+        payments,
+        subtotal: calculatedSubtotal,
+        discount: overallDiscount,
+        tax,
+        totalAmount,
+        paidAmount,
+        dueAmount: debtAmount,
+        status: 'COMPLETED',
+        notes: data.notes || '',
+        cashierId,
+        createdBy: cashierId
+      };
+
+      if (clientRequestId) {
+        salePayload.clientRequestId = clientRequestId;
+      }
+
+      const [sale] = await Sale.create(
+        [salePayload],
+        session ? { session } : {}
+      );
+
+      // Step 5: Decrease stock atomically & record InventoryTransaction
+      for (const item of processedItems) {
+        const product = item.productRef;
+        const previousStock = product.stock;
+        const newStock = previousStock - item.quantity;
+
+        const opts = { new: true };
+        if (session) opts.session = session;
+
+        const updatedProd = await Product.findOneAndUpdate(
+          { _id: product._id, orgId, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity } },
+          opts
+        );
+
+        if (!updatedProd) {
+          const error = new Error(`Stock changed concurrently for '${product.name}'. Insufficient quantity remaining.`);
+          error.statusCode = 400;
+          throw error;
+        }
+
+        await InventoryTransaction.create(
+          [{
+            orgId,
+            productId: product._id,
+            branchId: data.branchId || product.branchId || user.branchId || null,
+            type: 'SALE',
+            quantity: -item.quantity,
+            previousStock,
+            newStock: updatedProd.stock,
+            reason: `عملية بيع بفاتورة رقم ${invoiceNumber}`,
+            reference: invoiceNumber,
+            referenceType: 'SALE_INVOICE',
+            createdBy: cashierId
+          }],
+          session ? { session } : {}
+        );
+      }
+
+      // Step 6: Update Customer Debt & Ledger if applicable
+      if (customer && debtAmount > 0) {
+        const balanceBefore = customer.balance;
+        const balanceAfter = balanceBefore + debtAmount;
+
+        const custOpts = {};
+        if (session) custOpts.session = session;
+
+        await Customer.findOneAndUpdate(
+          { _id: customer._id, orgId },
+          { $inc: { balance: debtAmount, totalPurchases: totalAmount }, $set: { updatedBy: cashierId } },
+          custOpts
+        );
+
+        await CustomerTransaction.create(
+          [{
+            orgId,
+            customerId: customer._id,
+            amount: debtAmount,
+            balanceBefore,
+            balanceAfter,
+            type: 'SALE',
+            reference: invoiceNumber,
+            createdBy: cashierId
+          }],
+          session ? { session } : {}
+        );
+      }
+
+      // Step 7: Calculate Loyalty Points if Customer attached
+      if (customer) {
+        const pointsEarned = Math.floor(totalAmount / 10);
+        if (pointsEarned > 0) {
+          const lpOpts = {};
+          if (session) lpOpts.session = session;
+
+          await Customer.findOneAndUpdate(
+            { _id: customer._id, orgId },
+            { $inc: { loyaltyPoints: pointsEarned } },
+            lpOpts
+          );
+
+          await LoyaltyPoint.create(
+            [{
+              orgId,
+              customerId: customer._id,
+              points: pointsEarned,
+              type: 'EARN',
+              description: `نقاط مكتسبة من الفاتورة رقم ${invoiceNumber}`,
+              createdBy: cashierId
+            }],
+            session ? { session } : {}
+          );
+        }
+      }
+
+      // Step 8: Activity Log
+      await ActivityLog.create(
+        [{
+          orgId,
+          userId: cashierId,
+          action: 'SALE_CREATED',
+          entity: 'Sale',
+          entityId: sale._id,
+          details: { invoiceNumber, totalAmount, paidAmount, customerName: customer?.name || 'عميل نقدي' },
+          ipAddress: req.ip || ''
+        }],
+        session ? { session } : {}
+      );
+
+      return getSaleById(sale._id, user);
+    });
+  } catch (err) {
+    // If concurrent requests passed pre-check simultaneously, unique index E11000 on { orgId, clientRequestId } catches collision
+    if (err.code === 11000 && clientRequestId && (err.keyPattern?.clientRequestId || err.message?.includes('clientRequestId'))) {
+      const existingSale = await Sale.findOne({ orgId, clientRequestId });
+      if (existingSale) {
+        return await getSaleById(existingSale._id, user);
+      }
     }
+    throw err;
   }
-
-  // Step 7: Save Sale Document
-  const sale = await Sale.create({
-    orgId,
-    invoiceNumber,
-    branchId: data.branchId || user.branchId || null,
-    shiftId: data.shiftId || null,
-    customerId: customer ? customer._id : null,
-    items: processedItems.map(i => ({
-      productId: i.productId,
-      name: i.name,
-      unit: i.unit,
-      quantity: i.quantity,
-      unitPrice: i.unitPrice,
-      discount: i.discount,
-      total: i.total
-    })),
-    payments,
-    subtotal: calculatedSubtotal,
-    discount: overallDiscount,
-    tax,
-    totalAmount,
-    paidAmount,
-    dueAmount: debtAmount,
-    status: 'COMPLETED',
-    notes: data.notes || '',
-    cashierId,
-    createdBy: cashierId
-  });
-
-  // Step 8: Activity Log
-  await ActivityLog.create({
-    orgId,
-    userId: cashierId,
-    action: 'SALE_CREATED',
-    entity: 'Sale',
-    entityId: sale._id,
-    details: { invoiceNumber, totalAmount, paidAmount, customerName: customer?.name || 'عميل نقدي' },
-    ipAddress: req.ip || ''
-  });
-
-  return getSaleById(sale._id, user);
 };
 
 export const holdSale = async (data, user, req = {}) => {
@@ -364,135 +424,164 @@ export const refundSale = async (id, { items, refundMethod = 'CASH', reason = ''
   }
 
   const orgId = user.orgId;
-  const sale = await Sale.findOne({ _id: id, orgId });
 
-  if (!sale) {
-    const error = new Error('Sale invoice not found');
-    error.statusCode = 404;
-    throw error;
-  }
+  return await executeTransaction(async (session) => {
+    const query = Sale.findOne({ _id: id, orgId });
+    if (session) query.session(session);
+    const sale = await query;
 
-  if (['HELD', 'CANCELLED'].includes(sale.status)) {
-    const error = new Error(`Cannot refund sale in ${sale.status} state`);
-    error.statusCode = 400;
-    throw error;
-  }
+    if (!sale) {
+      const error = new Error('Sale invoice not found');
+      error.statusCode = 404;
+      throw error;
+    }
 
-  const itemMap = new Map();
-  items.forEach(i => itemMap.set(i.productId.toString(), Number(i.quantity)));
+    if (['HELD', 'CANCELLED'].includes(sale.status)) {
+      const error = new Error(`Cannot refund sale in ${sale.status} state`);
+      error.statusCode = 400;
+      throw error;
+    }
 
-  let totalRefundAmount = 0;
-  const returnItems = [];
+    const itemMap = new Map();
+    items.forEach(i => itemMap.set(i.productId.toString(), Number(i.quantity)));
 
-  for (const item of sale.items) {
-    const pId = item.productId.toString();
-    if (itemMap.has(pId)) {
-      const qtyToRefund = itemMap.get(pId);
-      const remainingRefundable = item.quantity - item.refundedQuantity;
+    let totalRefundAmount = 0;
+    const returnItems = [];
 
-      if (qtyToRefund > remainingRefundable) {
-        const error = new Error(`Cannot refund ${qtyToRefund} for product '${item.name}'. Maximum refundable quantity is ${remainingRefundable}`);
-        error.statusCode = 400;
-        throw error;
-      }
+    for (const item of sale.items) {
+      const pId = item.productId.toString();
+      if (itemMap.has(pId)) {
+        const qtyToRefund = itemMap.get(pId);
+        const remainingRefundable = item.quantity - item.refundedQuantity;
 
-      const itemRefundValue = qtyToRefund * item.unitPrice;
-      totalRefundAmount += itemRefundValue;
-      item.refundedQuantity += qtyToRefund;
+        if (qtyToRefund > remainingRefundable) {
+          const error = new Error(`Cannot refund ${qtyToRefund} for product '${item.name}'. Maximum refundable quantity is ${remainingRefundable}`);
+          error.statusCode = 400;
+          throw error;
+        }
 
-      returnItems.push({
-        productId: item.productId,
-        quantity: qtyToRefund,
-        unitPrice: item.unitPrice,
-        refundAmount: itemRefundValue
-      });
+        const itemRefundValue = qtyToRefund * item.unitPrice;
+        totalRefundAmount += itemRefundValue;
+        item.refundedQuantity += qtyToRefund;
 
-      // Increase product stock & create InventoryTransaction
-      const product = await Product.findOne({ _id: item.productId, orgId });
-      if (product) {
-        const previousStock = product.stock;
-        const newStock = previousStock + qtyToRefund;
-
-        product.stock = newStock;
-        await product.save();
-
-        await InventoryTransaction.create({
-          orgId,
-          productId: product._id,
-          branchId: sale.branchId || product.branchId || null,
-          type: 'RETURN',
+        returnItems.push({
+          productId: item.productId,
           quantity: qtyToRefund,
-          previousStock,
-          newStock,
-          reason: `مرتجع مبيعات للفاتورة رقم ${sale.invoiceNumber}`,
-          reference: sale.invoiceNumber,
-          referenceType: 'SALE_RETURN',
-          createdBy: user._id
+          unitPrice: item.unitPrice,
+          refundAmount: itemRefundValue
         });
+
+        // Atomically increase product stock & create InventoryTransaction
+        const opts = { new: true };
+        if (session) opts.session = session;
+
+        const updatedProd = await Product.findOneAndUpdate(
+          { _id: item.productId, orgId },
+          { $inc: { stock: qtyToRefund } },
+          opts
+        );
+
+        if (updatedProd) {
+          const newStock = updatedProd.stock;
+          const previousStock = newStock - qtyToRefund;
+
+          await InventoryTransaction.create(
+            [{
+              orgId,
+              productId: item.productId,
+              branchId: sale.branchId || null,
+              type: 'RETURN',
+              quantity: qtyToRefund,
+              previousStock,
+              newStock,
+              reason: `مرتجع مبيعات للفاتورة رقم ${sale.invoiceNumber}`,
+              reference: sale.invoiceNumber,
+              referenceType: 'SALE_RETURN',
+              createdBy: user._id
+            }],
+            session ? { session } : {}
+          );
+        }
       }
     }
-  }
 
-  if (returnItems.length === 0) {
-    const error = new Error('No valid items specified for refund');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  // Handle Customer Ledger if customer attached & refund method is CUSTOMER_BALANCE
-  if (sale.customerId && refundMethod === 'CUSTOMER_BALANCE') {
-    const customer = await Customer.findOne({ _id: sale.customerId, orgId });
-    if (customer) {
-      const balanceBefore = customer.balance;
-      const balanceAfter = balanceBefore - totalRefundAmount;
-
-      customer.balance = balanceAfter;
-      customer.updatedBy = user._id;
-      await customer.save();
-
-      await CustomerTransaction.create({
-        orgId,
-        customerId: customer._id,
-        amount: totalRefundAmount,
-        balanceBefore,
-        balanceAfter,
-        type: 'REFUND',
-        reference: sale.invoiceNumber,
-        createdBy: user._id
-      });
+    if (returnItems.length === 0) {
+      const error = new Error('No valid items specified for refund');
+      error.statusCode = 400;
+      throw error;
     }
-  }
 
-  // Determine new sale status (PARTIAL_REFUND or REFUNDED)
-  const isFullyRefunded = sale.items.every(i => i.refundedQuantity >= i.quantity);
-  sale.status = isFullyRefunded ? 'REFUNDED' : 'PARTIAL_REFUND';
-  await sale.save();
+    // Handle Customer Ledger if customer attached & refund method is CUSTOMER_BALANCE
+    if (sale.customerId && refundMethod === 'CUSTOMER_BALANCE') {
+      const custQuery = Customer.findOne({ _id: sale.customerId, orgId });
+      if (session) custQuery.session(session);
+      const customer = await custQuery;
 
-  const returnNumber = `RET-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-  const returnRecord = await Return.create({
-    orgId,
-    returnNumber,
-    saleId: sale._id,
-    invoiceNumber: sale.invoiceNumber,
-    customerId: sale.customerId,
-    items: returnItems,
-    totalRefundAmount,
-    refundMethod,
-    reason: reason || 'مرتجع مبيعات',
-    createdBy: user._id
+      if (customer) {
+        const balanceBefore = customer.balance;
+        const balanceAfter = balanceBefore - totalRefundAmount;
+
+        const custOpts = {};
+        if (session) custOpts.session = session;
+
+        await Customer.findOneAndUpdate(
+          { _id: sale.customerId, orgId },
+          { $inc: { balance: -totalRefundAmount } },
+          custOpts
+        );
+
+        await CustomerTransaction.create(
+          [{
+            orgId,
+            customerId: customer._id,
+            amount: totalRefundAmount,
+            balanceBefore,
+            balanceAfter,
+            type: 'REFUND',
+            reference: sale.invoiceNumber,
+            createdBy: user._id
+          }],
+          session ? { session } : {}
+        );
+      }
+    }
+
+    const isFullyRefunded = sale.items.every(i => i.refundedQuantity >= i.quantity);
+    sale.status = isFullyRefunded ? 'REFUNDED' : 'PARTIAL_REFUND';
+    await sale.save(session ? { session } : {});
+
+    const returnNumber = `RET-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+    const [returnRecord] = await Return.create(
+      [{
+        orgId,
+        returnNumber,
+        saleId: sale._id,
+        invoiceNumber: sale.invoiceNumber,
+        customerId: sale.customerId,
+        items: returnItems,
+        totalRefundAmount,
+        refundMethod,
+        reason: reason || 'مرتجع مبيعات',
+        createdBy: user._id
+      }],
+      session ? { session } : {}
+    );
+
+    await ActivityLog.create(
+      [{
+        orgId,
+        userId: user._id,
+        action: 'SALE_REFUNDED',
+        entity: 'Sale',
+        entityId: sale._id,
+        details: { invoiceNumber: sale.invoiceNumber, returnNumber, totalRefundAmount, status: sale.status },
+        ipAddress: req.ip || ''
+      }],
+      session ? { session } : {}
+    );
+
+    return { sale, returnRecord };
   });
-
-  await ActivityLog.create({
-    orgId,
-    userId: user._id,
-    action: 'SALE_REFUNDED',
-    entity: 'Sale',
-    entityId: sale._id,
-    details: { invoiceNumber: sale.invoiceNumber, returnNumber, totalRefundAmount, status: sale.status },
-    ipAddress: req.ip || ''
-  });
-
-  return { sale, returnRecord };
 };
 
 export const cancelSale = async (id, reason = '', user, req = {}) => {

@@ -24,6 +24,10 @@ export const getDemoStatus = async (req, res) => {
 
 export const resetDemoEnvironment = async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_RESET !== 'true') {
+      return errorResponse(res, 'إعادة ضبط البيئة التجريبية معطلة في بيئة الإنتاج الحقيقية للحماية 🔒', 403);
+    }
+
     const result = await seedDemoEnvironment();
     return successResponse(res, { result: 'Demo database reset successfully' }, 'تم إعادة ضبط بيئة مدار التجريبية بنجاح! 🎉', 200);
   } catch (error) {

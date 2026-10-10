@@ -2,7 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import Invoice from '../models/Invoice.js';
 import Product from '../models/Product.js';
-import { protect, checkSubscription } from '../middleware/auth.js';
+import { protect, checkSubscription, authorize } from '../middleware/auth.js';
 import { sanitizeBody, injectOrgId, checkOwnership } from '../middleware/tenant.js';
 import asyncHandler from '../middleware/asyncHandler.js';
 
@@ -13,17 +13,22 @@ router.use(checkSubscription);
 
 // @route   GET api/invoices
 // @desc    Get all invoices for this shop
-// @access  Private
-router.get('/', asyncHandler(async (req, res) => {
-  const invoices = await Invoice.find({ orgId: req.user.orgId }).sort({ createdAt: -1 });
-  res.json({ success: true, count: invoices.length, invoices });
-}));
+// @access  Private (Owner, Admin, Manager, Cashier, Accountant)
+router.get(
+  '/',
+  authorize('owner', 'admin', 'manager', 'cashier', 'accountant'),
+  asyncHandler(async (req, res) => {
+    const invoices = await Invoice.find({ orgId: req.user.orgId }).sort({ createdAt: -1 });
+    res.json({ success: true, count: invoices.length, invoices });
+  })
+);
 
 // @route   POST api/invoices
 // @desc    Complete a POS checkout sale, create invoice, and deduct inventory stock atomically
-// @access  Private
+// @access  Private (Owner, Admin, Manager, Cashier)
 router.post(
   '/',
+  authorize('owner', 'admin', 'manager', 'cashier'),
   sanitizeBody(),
   injectOrgId,
   asyncHandler(async (req, res) => {
@@ -107,9 +112,10 @@ router.post(
 
 // @route   PUT api/invoices/:id
 // @desc    Update invoice (e.g., status, items list, total for refunds)
-// @access  Private
+// @access  Private (Owner, Admin, Manager)
 router.put(
   '/:id',
+  authorize('owner', 'admin', 'manager'),
   sanitizeBody(),
   checkOwnership({ Model: Invoice, param: 'id' }),
   asyncHandler(async (req, res) => {

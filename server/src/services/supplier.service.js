@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import Supplier from '../../models/Supplier.js';
 import SupplierTransaction from '../../models/SupplierTransaction.js';
 import ActivityLog from '../../models/ActivityLog.js';
+import { executeTransaction } from '../utils/transaction.js';
 
 const buildPagination = (data, page, limit, totalItems) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -216,44 +217,67 @@ export const settleDebt = async (id, { amount, type = 'PAYMENT', reference = '',
     throw error;
   }
 
-  const orgId = user.orgId;
-  const supplier = await Supplier.findOne({ _id: id, orgId, isDeleted: { $ne: true } });
-  if (!supplier) {
-    const error = new Error('Supplier not found');
-    error.statusCode = 404;
+  const payAmount = Number(amount || 0);
+  if (isNaN(payAmount) || payAmount <= 0) {
+    const error = new Error('Payment amount must be a positive number');
+    error.statusCode = 400;
     throw error;
   }
 
-  const payAmount = Number(amount);
-  const balanceBefore = supplier.balance;
-  const balanceAfter = balanceBefore - payAmount;
+  const orgId = user.orgId;
 
-  supplier.balance = balanceAfter;
-  supplier.updatedBy = user._id;
-  await supplier.save();
+  return await executeTransaction(async (session) => {
+    const opts = { new: true };
+    if (session) opts.session = session;
 
-  const transaction = await SupplierTransaction.create({
-    orgId,
-    supplierId: supplier._id,
-    amount: payAmount,
-    balanceBefore,
-    balanceAfter,
-    type: type || 'PAYMENT',
-    reference: reference || notes || 'سداد مستحقات للمورد',
-    createdBy: user._id
+    // Atomically decrement supplier balance (payable debt)
+    const updatedSupplier = await Supplier.findOneAndUpdate(
+      { _id: id, orgId, isDeleted: { $ne: true } },
+      { $inc: { balance: -payAmount }, $set: { updatedBy: user._id } },
+      opts
+    );
+
+    if (!updatedSupplier) {
+      const error = new Error('Supplier not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const balanceAfter = updatedSupplier.balance;
+    const balanceBefore = balanceAfter + payAmount;
+
+    const txOpts = {};
+    if (session) txOpts.session = session;
+
+    const [transaction] = await SupplierTransaction.create(
+      [{
+        orgId,
+        supplierId: updatedSupplier._id,
+        amount: payAmount,
+        balanceBefore,
+        balanceAfter,
+        type: type || 'PAYMENT',
+        reference: reference || notes || 'سداد مستحقات للمورد',
+        createdBy: user._id
+      }],
+      txOpts
+    );
+
+    await ActivityLog.create(
+      [{
+        orgId,
+        userId: user._id,
+        action: 'SUPPLIER_SETTLEMENT',
+        entity: 'Supplier',
+        entityId: updatedSupplier._id,
+        details: { amount: payAmount, balanceBefore, balanceAfter },
+        ipAddress: req.ip || ''
+      }],
+      txOpts
+    );
+
+    return { supplier: updatedSupplier, transaction };
   });
-
-  await ActivityLog.create({
-    orgId,
-    userId: user._id,
-    action: 'SUPPLIER_SETTLEMENT',
-    entity: 'Supplier',
-    entityId: supplier._id,
-    details: { amount: payAmount, balanceBefore, balanceAfter },
-    ipAddress: req.ip || ''
-  });
-
-  return { supplier, transaction };
 };
 
 export const getStatement = async (id, queryParams, user) => {
